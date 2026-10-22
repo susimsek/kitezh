@@ -120,6 +120,88 @@ test("authentication flow bridge allows the Web flow contracts and rejects widen
     );
 });
 
+test("allows only bounded Admin user-profile setting routes", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  for (const [method, path] of [
+    ["GET", "/api/admin/settings/user-profile/7"],
+    ["PUT", "/api/admin/settings/user-profile/7"],
+    ["DELETE", "/api/admin/settings/user-profile/7"],
+    ["GET", "/api/admin/settings/user-profile/page"],
+    ["GET", "/api/admin/settings/user-profile/page?q=preferred&page=2&size=50&sort=name,desc"],
+    ["GET", "/api/admin/settings/user-profile/page?page=999999&size=100&sort=displayOrder,desc"],
+  ]) {
+    try {
+      assert.equal((await adapter.request({ console: "admin", method, path })).status, 200, `${method} ${path}`);
+    } catch (error) {
+      error.message = `${method} ${path}: ${error.message}`;
+      throw error;
+    }
+  }
+  for (const [method, path] of [
+    ["GET", "/api/admin/settings/user-profile/0"],
+    ["PATCH", "/api/admin/settings/user-profile/7"],
+    ["GET", "/api/admin/settings/user-profile/9007199254740992"],
+    ["GET", "/api/admin/settings/user-profile/page?page=-1"],
+    ["GET", "/api/admin/settings/user-profile/page?page=01"],
+    ["GET", "/api/admin/settings/user-profile/page?page=10000000"],
+    ["GET", "/api/admin/settings/user-profile/page?size=0"],
+    ["GET", "/api/admin/settings/user-profile/page?size=101"],
+    ["GET", "/api/admin/settings/user-profile/page?sort=id,asc"],
+    ["GET", "/api/admin/settings/user-profile/page?q=" + "a".repeat(201)],
+    ["GET", "/api/admin/settings/user-profile/page?unknown=true"],
+    ["GET", "/api/admin/settings/user-profile/page?page=0&page=1"],
+    ["GET", "//attacker.invalid/api/admin/settings/user-profile/page"],
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", method, path }),
+      /not allowed/,
+      `${method} ${path}`,
+    );
+  }
+  const OriginalURL = globalThis.URL;
+  globalThis.URL = class extends OriginalURL {
+    constructor(input, base) {
+      if (String(input).includes("/api/admin/settings/user-profile/page"))
+        throw new TypeError("malformed page URL");
+      super(input, base);
+    }
+  };
+  try {
+    await assert.rejects(
+      adapter.request({ console: "admin", path: "/api/admin/settings/user-profile/page" }),
+      /not allowed/,
+    );
+  } finally {
+    globalThis.URL = OriginalURL;
+  }
+});
+
+test("allows the Settings screens to read and update only their existing API routes", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  for (const [method, path] of [
+    ["GET", "/api/admin/settings/registration-captcha"],
+    ["PUT", "/api/admin/settings/registration-captcha"],
+    ["GET", "/api/admin/settings/social-providers"],
+    ["PUT", "/api/admin/settings/social-providers"],
+    ["POST", "/api/admin/settings/email/test"],
+    ["GET", "/api/admin/events/config"],
+    ["PUT", "/api/admin/events/config"],
+    ["PUT", "/api/admin/settings/user-profile/order"],
+    ["POST", "/api/admin/settings/user-profile"],
+    ["GET", "/api/admin/settings/user-profile"],
+  ])
+    assert.equal((await adapter.request({ console: "admin", method, path, body: {} })).status, 200, `${method} ${path}`);
+  for (const [method, path] of [
+    ["POST", "/api/admin/settings/registration-captcha"],
+    ["DELETE", "/api/admin/settings/social-providers"],
+    ["GET", "/api/admin/settings/email/test"],
+    ["DELETE", "/api/admin/events/config"],
+    ["POST", "/api/admin/settings/user-profile/order"],
+    ["PUT", "/api/admin/settings/user-profile"],
+  ])
+    await assert.rejects(adapter.request({ console: "admin", method, path }), /not allowed/, `${method} ${path}`);
+});
+
 test("authentication flow bridge rejects malformed URL parsing", async () => {
   const { adapter } = harness(async () => new Response("{}", { status: 200 }));
   const NativeURL = globalThis.URL;

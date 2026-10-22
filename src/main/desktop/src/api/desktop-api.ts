@@ -815,6 +815,31 @@ function isAllowedApiPath(
     )
       return true;
     if (
+      (method === "GET" || method === "PUT") &&
+      (path === "/api/admin/settings/registration-captcha" ||
+        path === "/api/admin/settings/social-providers")
+    )
+      return true;
+    if (method === "POST" && path === "/api/admin/settings/email/test")
+      return true;
+    if (method === "PUT" && path === "/api/admin/events/config") return true;
+    if (method === "GET" && path === "/api/admin/events/config") return true;
+    if (
+      method === "PUT" &&
+      path === "/api/admin/settings/user-profile/order"
+    )
+      return true;
+    if (method === "POST" && path === "/api/admin/settings/user-profile")
+      return true;
+    const userProfileDefinitionMatch =
+      /^\/api\/admin\/settings\/user-profile\/([1-9]\d*)$/.exec(path);
+    if (
+      userProfileDefinitionMatch &&
+      Number.isSafeInteger(Number(userProfileDefinitionMatch[1])) &&
+      ["GET", "PUT", "DELETE"].includes(method)
+    )
+      return true;
+    if (
       method === "POST" &&
       (path === "/api/admin/settings/offline-access/revoke-all" ||
         path === "/api/admin/sessions/revoke-all")
@@ -922,6 +947,30 @@ function isAllowedApiPath(
     )
       return true;
     if (path === "/api/admin/settings/localization") return true;
+    if (path === "/api/admin/settings/user-profile") return true;
+    if (path.split("?")[0] === "/api/admin/settings/user-profile/page") {
+      try {
+        const url = new URL(path, "https://desktop.invalid");
+        return (
+          url.origin === "https://desktop.invalid" &&
+          !url.hash &&
+          [...new Set(url.searchParams.keys())].every(
+            (key) => url.searchParams.getAll(key).length === 1,
+          ) &&
+          [...url.searchParams.keys()].every((key) =>
+            ["q", "page", "size", "sort"].includes(key),
+          ) &&
+          /^(0|[1-9]\d{0,6})$/.test(url.searchParams.get("page") ?? "0") &&
+          /^(?:[1-9]\d?|100)$/.test(url.searchParams.get("size") ?? "10") &&
+          ["displayOrder,asc", "displayOrder,desc", "name,asc", "name,desc"].includes(
+            url.searchParams.get("sort") ?? "displayOrder,asc",
+          ) &&
+          (url.searchParams.get("q")?.length ?? 0) <= 200
+        );
+      } catch {
+        return false;
+      }
+    }
     if (
       path === "/api/admin/authentication/bindings" ||
       path === "/api/admin/authentication/execution-providers"

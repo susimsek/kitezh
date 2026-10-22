@@ -559,25 +559,6 @@ const adminNavigation = [
     "globe",
     (access) => access?.isAdmin === true,
   ],
-  [
-    "policies",
-    "adminPolicies",
-    "shieldHalved",
-    (access) => access?.isAdmin === true,
-  ],
-  [
-    "login-email",
-    "adminLoginEmail",
-    "sliders",
-    (access) => access?.isAdmin === true,
-  ],
-  [
-    "localization",
-    "adminLocalization",
-    "globe",
-    (access) => access?.isAdmin === true,
-  ],
-  ["ldap", "adminLdap", "globe", (access) => access?.isAdmin === true],
 ];
 const ADMIN_ACCESS_KEYS = [
   "isAdmin",
@@ -892,7 +873,7 @@ function routeTitle() {
       events: text("adminEvents"),
       keys: text("adminNavKeys"),
       policies: text("adminPolicies"),
-      configuration: text("adminConfiguration"),
+      configuration: text("adminNavSettings"),
       "server-info": text("adminServerInfo"),
       "login-email": text("adminLoginEmail"),
       localization: text("adminLocalization"),
@@ -946,7 +927,7 @@ function routeDescription() {
       events: text("adminEventsDescription"),
       keys: text("adminKeysDescription"),
       policies: text("adminPoliciesDescription"),
-      configuration: text("adminConfigurationDescription"),
+      configuration: text("settingsDescription"),
       "server-info": text("adminServerInfoDescription"),
       "login-email": text("adminLoginEmailDescription"),
       localization: text("adminLocalizationDescription"),
@@ -1022,7 +1003,7 @@ function adminContent() {
   if (state.route === "events") return adminAdminEventsContent();
   if (state.route === "keys") return adminAdminKeysContent();
   if (state.route === "policies") return adminAdminPoliciesContent();
-  if (state.route === "configuration") return adminAdminConfigurationContent();
+  if (state.route === "configuration") return adminSettingsContent();
   if (state.route === "server-info") return adminServerInfoContent();
   if (state.route === "login-email") return adminAdminLoginEmailContent();
   if (state.route === "localization") return adminAdminLocalizationContent();
@@ -5111,7 +5092,182 @@ function adminAdminPoliciesContent() {
         () => "",
       )}>${escapeHtml(text("cancel"))}</button></div>`
     : `<div class="settings-row"><div><strong>${escapeHtml(text("adminRevokeAllOfflineTokensTitle"))}</strong><p class="muted">${escapeHtml(text("adminRevokeAllOfflineTokensHelp"))}</p></div>${button(text("adminRevokeAllOfflineTokens"), { action: "admin-offline-access-revoke-request", danger: true, disabled: state.offline || Boolean(state.busy) })}</div>`;
-  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminCibaPolicy"))}"><h2>${escapeHtml(text("adminCibaPolicy"))}</h2><form data-form="admin-ciba-policy" novalidate>${field("requestLifespanSeconds", text("adminRequestLifespan"), cibaDraft.requestLifespanSeconds ?? "", errors.requestLifespanSeconds, "number", 'min="30" max="3600" required')}${field("pollingIntervalSeconds", text("adminPollingInterval"), cibaDraft.pollingIntervalSeconds ?? "", errors.pollingIntervalSeconds, "number", 'min="1" max="300" required')}<div class="field"><label for="deliveryMode">${escapeHtml(text("adminDeliveryMode"))}</label><select id="deliveryMode" name="deliveryMode"><option value="all" ${cibaDraft.deliveryMode === "all" ? "selected" : ""}>all</option><option value="poll" ${cibaDraft.deliveryMode === "poll" ? "selected" : ""}>poll</option><option value="ping" ${cibaDraft.deliveryMode === "ping" ? "selected" : ""}>ping</option><option value="push" ${cibaDraft.deliveryMode === "push" ? "selected" : ""}>push</option></select><div class="field-error">${escapeHtml(errors.deliveryMode ?? "")}</div></div><div class="field"><label for="userVerification">${escapeHtml(text("adminUserVerification"))}</label><select id="userVerification" name="userVerification"><option value="required" ${cibaDraft.userVerification === "required" ? "selected" : ""}>required</option><option value="preferred" ${cibaDraft.userVerification === "preferred" ? "selected" : ""}>preferred</option><option value="discouraged" ${cibaDraft.userVerification === "discouraged" ? "selected" : ""}>discouraged</option></select><div class="field-error">${escapeHtml(errors.userVerification ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="mfaRequired" ${cibaDraft.mfaRequired ? "checked" : ""}/>${escapeHtml(text("adminMfaRequired"))}</label><label class="settings-row"><input type="checkbox" name="stepUpRequired" ${cibaDraft.stepUpRequired ? "checked" : ""}/>${escapeHtml(text("adminStepUpRequired"))}</label>${field("stepUpAcr", text("adminStepUpAcr"), cibaDraft.stepUpAcr ?? "", errors.stepUpAcr, "text", 'maxlength="100"')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-ciba-policy", disabled: state.offline })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminOfflineAccessPolicy"))}"><h2>${escapeHtml(text("adminOfflineAccessPolicy"))}</h2><form data-form="admin-offline-access-policy" novalidate>${field("idleTimeout", text("adminIdleTimeout"), offlineDraft.idleTimeout ?? "", errors.idleTimeout, "text", 'required placeholder="P30D"')}${field("maxLifespan", text("adminMaxLifespan"), offlineDraft.maxLifespan ?? "", errors.maxLifespan, "text", 'placeholder="P180D"')}<div class="field"><label class="settings-row"><input type="checkbox" name="maxLimited" ${offlineDraft.maxLimited ? "checked" : ""}/>${escapeHtml(text("adminMaxLimited"))}</label><div class="field-error">${escapeHtml(errors.maxLimited ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-offline-access-policy", disabled: state.offline })}</div></form><div class="actions">${revokeAll}</div></section></div>`;
+  return `<div class="grid two-col"><section class="card" aria-label="${escapeHtml(text("adminCibaPolicy"))}"><h2>${escapeHtml(text("adminCibaPolicy"))}</h2><form data-form="admin-ciba-policy" novalidate>${field("requestLifespanSeconds", text("adminRequestLifespan"), cibaDraft.requestLifespanSeconds ?? "", errors.requestLifespanSeconds, "number", 'min="30" max="3600" required')}${field("pollingIntervalSeconds", text("adminPollingInterval"), cibaDraft.pollingIntervalSeconds ?? "", errors.pollingIntervalSeconds, "number", 'min="1" max="300" required')}<div class="field"><label for="deliveryMode">${escapeHtml(text("adminDeliveryMode"))}</label><select id="deliveryMode" name="deliveryMode"><option value="all" ${cibaDraft.deliveryMode === "all" ? "selected" : ""}>all</option><option value="poll" ${cibaDraft.deliveryMode === "poll" ? "selected" : ""}>poll</option><option value="ping" ${cibaDraft.deliveryMode === "ping" ? "selected" : ""}>ping</option><option value="push" ${cibaDraft.deliveryMode === "push" ? "selected" : ""}>push</option></select><div class="field-error">${escapeHtml(errors.deliveryMode ?? "")}</div></div><div class="field"><label for="userVerification">${escapeHtml(text("adminUserVerification"))}</label><select id="userVerification" name="userVerification"><option value="required" ${cibaDraft.userVerification === "required" ? "selected" : ""}>required</option><option value="preferred" ${cibaDraft.userVerification === "preferred" ? "selected" : ""}>preferred</option><option value="discouraged" ${cibaDraft.userVerification === "discouraged" ? "selected" : ""}>discouraged</option></select><div class="field-error">${escapeHtml(errors.userVerification ?? "")}</div></div>${settingsSwitch("mfaRequired", "adminMfaRequired", cibaDraft.mfaRequired)}${settingsSwitch("stepUpRequired", "adminStepUpRequired", cibaDraft.stepUpRequired)}${field("stepUpAcr", text("adminStepUpAcr"), cibaDraft.stepUpAcr ?? "", errors.stepUpAcr, "text", 'maxlength="100"')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-ciba-policy", disabled: state.offline })}</div></form></section><section class="card" aria-label="${escapeHtml(text("adminOfflineAccessPolicy"))}"><h2>${escapeHtml(text("adminOfflineAccessPolicy"))}</h2><form data-form="admin-offline-access-policy" novalidate>${field("idleTimeout", text("adminIdleTimeout"), offlineDraft.idleTimeout ?? "", errors.idleTimeout, "text", 'required placeholder="P30D"')}${field("maxLifespan", text("adminMaxLifespan"), offlineDraft.maxLifespan ?? "", errors.maxLifespan, "text", 'placeholder="P180D"')}${settingsSwitch("maxLimited", "adminMaxLimited", offlineDraft.maxLimited)}<div class="field-error">${escapeHtml(errors.maxLimited ?? "")}</div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-offline-access-policy", disabled: state.offline })}</div></form><div class="actions">${revokeAll}</div></section></div>`;
+}
+
+const adminSettingsTabs = [
+  ["general", "settingsGeneral"],
+  ["login", "settingsLogin"],
+  ["social-login", "settingsSocialLogin"],
+  ["user-federation", "settingsUserFederation"],
+  ["email", "settingsEmail"],
+  ["brute-force", "settingsBruteForce"],
+  ["sessions", "adminSessions"],
+  ["events", "adminEvents"],
+  ["ciba-policy", "adminCibaPolicy"],
+  ["offline-access", "settingsOfflineAccess"],
+  ["user-profile", "settingsUserProfile"],
+  ["localization", "adminLocalization"],
+  ["branding", "adminBranding"],
+];
+
+function adminSettingsContent() {
+  const tabs = state.data.adminAccess?.isAdmin === true
+    ? adminSettingsTabs
+    : adminSettingsTabs.filter(([key]) => key === "events");
+  const active = tabs.some(([key]) => key === state.data.adminSettingsSection)
+    ? state.data.adminSettingsSection
+    : tabs[0][0];
+  const tabBar = `<nav class="detail-tabs admin-settings-tabs" role="tablist" aria-label="${escapeHtml(text("adminNavSettings"))}">${tabs.map(([key, label], index) => `<button type="button" role="tab" id="admin-settings-tab-${key}" aria-controls="admin-settings-panel" aria-selected="${active === key}" tabindex="${active === key ? "0" : "-1"}" class="${active === key ? "active" : ""}" data-action="admin-settings-tab" data-tab="${key}" data-tab-index="${index}">${escapeHtml(text(label))}</button>`).join("")}</nav>`;
+  const content = active === "general"
+    ? adminSettingsGeneralContent()
+    : active === "login"
+      ? adminSettingsLoginContent()
+      : active === "social-login"
+        ? adminSettingsSocialContent()
+        : active === "user-federation"
+          ? adminAdminLdapContent()
+          : active === "email"
+            ? adminSettingsEmailContent()
+            : active === "brute-force"
+              ? adminSettingsBruteForceContent()
+              : active === "sessions"
+                ? adminSettingsSessionsContent()
+                : active === "events"
+                  ? adminSettingsEventsContent()
+                  : active === "ciba-policy"
+                    ? adminSettingsCibaContent()
+                    : active === "offline-access"
+                      ? adminSettingsOfflineContent()
+                      : active === "user-profile"
+                        ? adminSettingsUserProfileContent()
+                        : active === "localization"
+                          ? adminSettingsLocalizationContent()
+                          : adminAdminConfigurationContent();
+  const panelContent = state.data.adminSettingsLoadErrors?.[active]
+    ? `<section class="card" role="alert">${escapeHtml(text("settingsLoadError"))}</section>`
+    : content;
+  return `${tabBar}<section id="admin-settings-panel" role="tabpanel" aria-labelledby="admin-settings-tab-${active}" class="admin-settings-panel">${panelContent}</section>`;
+}
+
+function adminSettingsGeneralContent() {
+  const server = state.data.adminServerInfo ?? {};
+  return `<section class="card"><h2>${escapeHtml(text("settingsGeneral"))}</h2><p class="muted">${escapeHtml(text("settingsGeneralDescription"))}</p><dl class="server-info-runtime"><dt>${escapeHtml(text("adminIssuer"))}</dt><dd><code>${escapeHtml(server.issuer ?? "—")}</code></dd></dl><p class="muted">${escapeHtml(text("settingsGeneralReadOnly"))}</p></section>`;
+}
+
+function settingsField(name, label, value, type = "text", attrs = "") {
+  return `<div class="field"><label for="admin-setting-${name}">${escapeHtml(text(label))}</label><input id="admin-setting-${name}" name="${name}" type="${type}" value="${escapeHtml(value ?? "")}" ${attrs}/><div class="field-error"></div></div>`;
+}
+
+function settingsSwitch(name, label, checked, value) {
+  const valueAttribute = value === undefined ? "" : `value="${escapeHtml(value)}"`;
+  return `<label class="settings-row native-settings-switch"><span class="native-settings-switch-label">${escapeHtml(text(label))}</span><input type="checkbox" role="switch" name="${name}" ${valueAttribute} ${checked ? "checked" : ""}/><span class="native-settings-switch-control" aria-hidden="true"></span></label>`;
+}
+
+function adminSettingsLoginContent() {
+  const value = {
+    userRegistration: true,
+    forgotPassword: true,
+    rememberMe: true,
+    passkeys: false,
+    loginWithEmail: false,
+    verifyEmail: false,
+    otpEnabled: false,
+    otpRequired: false,
+    sessionTimeoutMinutes: 30,
+    passwordMinimumLength: 12,
+    bruteForceMaxFailures: 5,
+    passwordResetTokenLifespanSeconds: 43200,
+    passwordResetResendCooldownSeconds: 30,
+    emailUpdateReauthenticationMinutes: 5,
+    ...(state.data.adminLoginSettings ?? {}),
+    ...(state.data.adminSettingsLoginDraft ?? {}),
+  };
+  const captcha = state.data.adminRegistrationCaptcha ?? {};
+  return `<section class="card"><h2>${escapeHtml(text("settingsLogin"))}</h2>${state.data.adminSettingsValidationMessage ? `<div class="notice error" role="alert">${escapeHtml(state.data.adminSettingsValidationMessage)}</div>` : ""}<form data-form="admin-settings-login" novalidate>${settingsSwitch("userRegistration", "adminRegistrationEnabled", value.userRegistration)}${settingsSwitch("forgotPassword", "adminForgotPasswordEnabled", value.forgotPassword)}${settingsSwitch("rememberMe", "adminRememberMeEnabled", value.rememberMe)}${settingsSwitch("passkeys", "adminPasskeysEnabled", value.passkeys)}${settingsSwitch("loginWithEmail", "adminLoginWithEmail", value.loginWithEmail)}${settingsSwitch("verifyEmail", "adminVerifyEmail", value.verifyEmail)}${settingsSwitch("otpEnabled", "adminOtpEnabled", value.otpEnabled)}${settingsSwitch("otpRequired", "adminOtpRequired", value.otpRequired)}${settingsField("sessionTimeoutMinutes", "adminSessionTimeout", value.sessionTimeoutMinutes, "number", 'min="1" max="1440" required')}${settingsField("passwordMinimumLength", "adminPasswordLength", value.passwordMinimumLength, "number", 'min="8" max="128" required')}${settingsField("bruteForceMaxFailures", "adminLoginFailureLimit", value.bruteForceMaxFailures, "number", 'min="1" max="100" required')}${settingsField("passwordResetTokenLifespanSeconds", "settingsResetLifespan", value.passwordResetTokenLifespanSeconds, "number", 'min="60" max="604800" required')}${settingsField("passwordResetResendCooldownSeconds", "settingsResetCooldown", value.passwordResetResendCooldownSeconds, "number", 'min="0" max="86400" required')}${settingsField("emailUpdateReauthenticationMinutes", "settingsEmailReauthentication", value.emailUpdateReauthenticationMinutes, "number", 'min="0" max="1440" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-settings-login", disabled: state.offline, icon: "save" })}</div></form></section><section class="card"><h2>${escapeHtml(text("adminCaptchaTitle"))}</h2><p class="muted">${escapeHtml(text("adminCaptchaHelp"))}</p><form data-form="admin-settings-captcha" novalidate>${settingsSwitch("enabled", "adminCaptchaEnabled", captcha.enabled)}${settingsSwitch("loginEnabled", "adminCaptchaLoginEnabled", captcha.loginEnabled)}<div class="field"><label for="admin-setting-captcha-provider">${escapeHtml(text("adminCaptchaProvider"))}</label><select id="admin-setting-captcha-provider" name="provider"><option value="recaptcha" ${captcha.provider !== "enterprise" ? "selected" : ""}>${escapeHtml(text("adminCaptchaProviderRecaptcha"))}</option><option value="enterprise" ${captcha.provider === "enterprise" ? "selected" : ""}>${escapeHtml(text("adminCaptchaProviderEnterprise"))}</option></select></div>${settingsField("siteKey", "adminCaptchaSiteKey", captcha.siteKey)}${settingsField("secretKey", "adminCaptchaSecret", "", "password", 'autocomplete="new-password"')}${captcha.secretConfigured ? `<p class="muted">${escapeHtml(text("settingsSecretConfigured"))}</p>` : ""}${settingsField("projectId", "adminCaptchaProjectId", captcha.projectId)}${settingsField("apiKey", "adminCaptchaApiKey", "", "password", 'autocomplete="new-password"')}${settingsField("action", "adminCaptchaAction", captcha.action ?? "register")}${settingsField("loginAction", "adminCaptchaLoginAction", captcha.loginAction ?? "login")}${settingsSwitch("recaptchaV3", "adminCaptchaV3", captcha.recaptchaV3)}${settingsField("scoreThreshold", "adminCaptchaScoreThreshold", captcha.scoreThreshold ?? 0.7, "number", 'min="0.1" max="0.9" step="0.1"')}${settingsSwitch("loginRecaptchaV3", "adminCaptchaLoginV3", captcha.loginRecaptchaV3)}${settingsField("loginScoreThreshold", "adminCaptchaLoginScoreThreshold", captcha.loginScoreThreshold ?? 0.7, "number", 'min="0.1" max="0.9" step="0.1"')}${settingsSwitch("useRecaptchaNet", "adminCaptchaUseRecaptchaNet", captcha.useRecaptchaNet)}<div class="actions">${button(text("adminCaptchaSave"), { type: "submit", busy: state.busy === "admin-settings-captcha", disabled: state.offline, icon: "save" })}</div></form></section>`;
+}
+
+function adminSettingsSocialContent() {
+  const providers = Array.isArray(state.data.adminSocialProviders)
+    ? state.data.adminSocialProviders
+    : [];
+  const login = state.data.adminLoginSettings ?? {};
+  const rows = ["google", "github", "linkedin", "microsoft"].map((provider) => {
+    const item = providers.find((entry) => entry.provider === provider) ?? { provider };
+    const label = provider[0].toUpperCase() + provider.slice(1);
+    return `<fieldset class="card"><legend>${escapeHtml(label)}</legend>${settingsSwitch(`${provider}LoginEnabled`, "settingsProviderEnabled", login[`${provider}LoginEnabled`])}${settingsField(`${provider}ClientId`, "settingsClientId", item.clientId)}${settingsField(`${provider}ClientSecret`, "settingsClientSecret", "", "password", 'autocomplete="new-password"')}<p class="muted">${escapeHtml(item.clientSecretConfigured ? text("settingsSecretConfigured") : text("settingsSecretNotConfigured"))}</p>${settingsField(`${provider}Alias`, "settingsProviderAlias", item.alias ?? provider)}${settingsField(`${provider}Order`, "settingsProviderOrder", item.guiOrder ?? 10, "number", 'min="0" max="10000"')}${settingsField(`${provider}RequiredClaims`, "settingsProviderClaims", item.requiredClaims ?? "sub")}${settingsSwitch(`${provider}TrustEmail`, "settingsTrustProviderEmail", item.trustEmail)}${settingsSwitch(`${provider}HideOnLogin`, "settingsHideProviderOnLogin", item.hideOnLogin)}${settingsSwitch(`${provider}AccountLinkingOnly`, "settingsAccountLinkingOnly", item.accountLinkingOnly)}${settingsSwitch(`${provider}MfaRequired`, "settingsProviderMfa", item.mfaRequired)}${settingsSwitch(`${provider}StoreTokens`, "settingsStoreProviderTokens", item.storeTokens)}${settingsSwitch(`${provider}StoredTokensReadable`, "settingsStoredTokensReadable", item.storedTokensReadable)}</fieldset>`;
+  }).join("");
+  return `<section class="card"><h2>${escapeHtml(text("settingsSocialLogin"))}</h2><p class="muted">${escapeHtml(text("settingsSocialLoginDescription"))}</p><form data-form="admin-settings-social" novalidate><div class="grid two-col">${rows}</div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-settings-social", disabled: state.offline })}</div></form></section>`;
+}
+
+function adminSettingsEmailContent() {
+  const email = state.data.adminEmailSettings ?? {};
+  return `<section class="card"><h2>${escapeHtml(text("adminEmailDelivery"))}</h2><form data-form="admin-email-settings" novalidate>${settingsSwitch("enabled", "adminEmailEnabled", email.enabled)}${settingsField("fromAddress", "adminEmailFromAddress", email.fromAddress, "email", 'maxlength="255" required')}${settingsField("port", "adminSmtpPort", email.port, "number", 'min="1" max="65535" required')}${settingsField("host", "adminSmtpHost", email.host, "text", 'maxlength="255" required')}${settingsField("username", "adminSmtpUsername", email.username, "text", 'maxlength="255"')}${settingsField("password", "adminSmtpPassword", "", "password", 'maxlength="1000" autocomplete="new-password"')}${settingsField("baseUrl", "adminEmailBaseUrl", email.baseUrl, "url", 'maxlength="255" required')}${settingsSwitch("smtpAuth", "adminSmtpAuthentication", email.smtpAuth)}${settingsSwitch("starttls", "adminStartTls", email.starttls)}${settingsSwitch("ssl", "adminSslTls", email.ssl)}<div class="actions"><button type="button" class="secondary-button" data-action="admin-settings-email-test" ${state.offline || state.busy ? "disabled" : ""}>${spin(state.busy === "admin-settings-email-test")}${escapeHtml(text("settingsTestConnection"))}</button>${button(text("adminEmailSave"), { type: "submit", busy: state.busy === "admin-email-settings", disabled: state.offline })}</div></form></section>`;
+}
+
+function adminSettingsBruteForceContent() {
+  const value = state.data.adminLoginSettings ?? {};
+  return `<section class="card"><h2>${escapeHtml(text("settingsBruteForce"))}</h2><form data-form="admin-settings-brute-force" novalidate>${settingsSwitch("bruteForceEnabled", "adminBruteForceProtection", value.bruteForceEnabled)}${settingsField("bruteForceMaxFailures", "adminLoginFailureLimit", value.bruteForceMaxFailures, "number", 'min="1" max="100" required')}${settingsField("bruteForceMaxSecondaryFailures", "settingsMfaFailureLimit", value.bruteForceMaxSecondaryFailures, "number", 'min="0" max="100" required')}${settingsField("mfaVerificationTimeoutSeconds", "settingsMfaTimeout", value.mfaVerificationTimeoutSeconds, "number", 'min="30" max="3600" required')}${settingsField("bruteForceQuickLoginWindowMillis", "settingsQuickLoginWindow", value.bruteForceQuickLoginWindowMillis, "number", 'min="0" max="60000" required')}${settingsField("bruteForceMinimumQuickLoginWaitSeconds", "settingsMinLockWait", value.bruteForceMinimumQuickLoginWaitSeconds, "number", 'min="1" max="86400" required')}${settingsField("bruteForceWaitIncrementSeconds", "settingsLockWaitIncrement", value.bruteForceWaitIncrementSeconds, "number", 'min="1" max="86400" required')}${settingsField("bruteForceMaxWaitSeconds", "settingsMaxLockWait", value.bruteForceMaxWaitSeconds, "number", 'min="1" max="604800" required')}${settingsField("bruteForceFailureResetTimeSeconds", "settingsFailureResetTime", value.bruteForceFailureResetTimeSeconds, "number", 'min="1" max="604800" required')}${settingsField("bruteForceMaxTemporaryLockouts", "settingsMaxTemporaryLockouts", value.bruteForceMaxTemporaryLockouts, "number", 'min="0" max="100" required')}${settingsSwitch("bruteForcePermanentLockout", "settingsPermanentLockout", value.bruteForcePermanentLockout)}${settingsField("bruteForceIpRequestsPerMinute", "settingsIpRateLimit", value.bruteForceIpRequestsPerMinute, "number", 'min="0" max="100000" required')}${settingsField("bruteForceUsernameIpRequestsPerMinute", "settingsUserIpRateLimit", value.bruteForceUsernameIpRequestsPerMinute, "number", 'min="0" max="100000" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-settings-brute-force", disabled: state.offline })}</div></form></section>`;
+}
+
+function adminSettingsSessionsContent() {
+  const value = state.data.adminLoginSettings ?? {};
+  return `<section class="card"><h2>${escapeHtml(text("settingsSessions"))}</h2><form data-form="admin-settings-sessions" novalidate>${settingsField("sessionTimeoutMinutes", "adminSessionTimeout", value.sessionTimeoutMinutes, "number", 'min="1" max="1440" required')}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-settings-sessions", disabled: state.offline })}</div></form></section>`;
+}
+
+function adminSettingsEventsContent() {
+  const value = state.data.adminEventsConfig ?? {};
+  return `<section class="card"><h2>${escapeHtml(text("settingsEvents"))}</h2><p class="muted">${escapeHtml(text("settingsEventsDescription"))}</p><form data-form="admin-settings-events" novalidate>${settingsSwitch("eventsEnabled", "settingsEventsEnabled", value.eventsEnabled)}${settingsSwitch("adminEventsEnabled", "settingsAdminEventsEnabled", value.adminEventsEnabled)}${settingsSwitch("adminEventsDetailsEnabled", "settingsEventDetails", value.adminEventsDetailsEnabled)}${settingsField("eventsExpirationDays", "settingsEventRetention", value.eventsExpirationDays, "number", 'min="0" max="3650" required')}<p class="muted">${escapeHtml(text("settingsEventRetentionHelp"))}</p><div class="actions">${button(text("settingsSaveEvents"), { type: "submit", busy: state.busy === "admin-settings-events", disabled: state.offline })}</div></form></section>`;
+}
+
+function adminSettingsCibaContent() {
+  return `<section class="card">${adminAdminPoliciesContent().match(/<section class="card" aria-label="[^"]+">[\s\S]*?<\/section>/)?.[0] ?? ""}</section>`;
+}
+
+function adminSettingsOfflineContent() {
+  const match = adminAdminPoliciesContent().match(/<section class="card" aria-label="[^"]+">[\s\S]*?<\/section><section class="card" aria-label="[^"]+">([\s\S]*?)<\/section><\/div>/);
+  return `<section class="card">${match?.[1] ?? ""}</section>`;
+}
+
+function adminSettingsUserProfileContent() {
+  const page = state.data.adminUserProfileDefinitions ?? { content: [] };
+  const query = String(state.data.adminUserProfileQuery ?? "").trim().toLowerCase();
+  const items = (Array.isArray(page.content) ? page.content : []).filter((item) => `${item.name} ${item.displayName} ${item.type}`.toLowerCase().includes(query));
+  const draft = state.data.adminUserProfileDraft;
+  const rows = items.map((item) => `<tr><td>${escapeHtml(item.displayName ?? item.name)}</td><td><code>${escapeHtml(item.name)}</code></td><td>${escapeHtml(item.type ?? "STRING")}</td><td>${escapeHtml(item.displayOrder ?? "—")}</td><td>${item.enabled === false ? text("adminDisabled") : text("adminEnabled")}</td><td>${button(text("adminEdit"), { action: "admin-settings-profile-edit", id: item.id, variant: "secondary" })}${item.builtIn ? "" : button(text("adminDelete"), { action: "admin-settings-profile-delete", id: item.id, danger: true })}</td></tr>`).join("");
+  const editor = draft ? `<section class="card"><h3>${escapeHtml(text(draft.id ? "settingsProfileEdit" : "settingsProfileCreate"))}</h3><form data-form="admin-settings-profile" novalidate>${settingsField("name", "settingsProfileName", draft.name ?? "", "text", 'maxlength="100" required')}${settingsField("displayName", "settingsProfileDisplayName", draft.displayName ?? "", "text", 'maxlength="200" required')}${settingsField("description", "settingsProfileDescriptionLabel", draft.description ?? "", "text", 'maxlength="1000"') }<div class="field"><label for="profile-type">${escapeHtml(text("settingsProfileType"))}</label><select id="profile-type" name="type">${["STRING", "EMAIL", "INTEGER", "BOOLEAN"].map((type) => `<option value="${type}" ${type === (draft.type ?? "STRING") ? "selected" : ""}>${escapeHtml(type)}</option>`).join("")}</select></div>${settingsField("displayOrder", "settingsProfileOrder", draft.displayOrder ?? 0, "number", 'min="0" max="10000" required')}${settingsField("minLength", "settingsProfileMinLength", draft.minLength ?? "", "number", 'min="0" max="2000"')}${settingsField("maxLength", "settingsProfileMaxLength", draft.maxLength ?? "", "number", 'min="0" max="2000"')}${settingsField("pattern", "settingsProfilePattern", draft.pattern ?? "", "text", 'maxlength="500"')}${settingsSwitch("required", "settingsProfileRequired", draft.required)}${settingsSwitch("multivalued", "settingsProfileMultivalued", draft.multivalued)}${settingsSwitch("enabled", "settingsProfileEnabled", draft.enabled !== false)}<div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-settings-profile", disabled: state.offline, icon: "save" })}<button class="secondary-button" type="button" data-action="admin-settings-profile-cancel">${escapeHtml(text("cancel"))}</button></div></form></section>` : "";
+  return `<section class="card"><div class="admin-detail-heading"><div><h2>${escapeHtml(text("settingsUserProfile"))}</h2><p class="muted">${escapeHtml(text("settingsUserProfileDescription"))}</p></div>${button(text("settingsProfileCreate"), { action: "admin-settings-profile-create", icon: "add", disabled: state.offline || state.data.adminAccess?.isAdmin !== true })}</div><label class="field"><span>${escapeHtml(text("adminSearch"))}</span><input id="admin-settings-profile-query" type="search" data-input="admin-settings-profile-search" value="${escapeHtml(state.data.adminUserProfileQuery ?? "")}" maxlength="200"/></label><div class="admin-session-table-scroll"><table class="admin-session-table"><thead><tr><th>${escapeHtml(text("settingsProfileDisplayName"))}</th><th>${escapeHtml(text("settingsProfileName"))}</th><th>${escapeHtml(text("settingsProfileType"))}</th><th>${escapeHtml(text("settingsProfileOrder"))}</th><th>${escapeHtml(text("settingsProfileEnabled"))}</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="6"><div class="empty" role="status">${escapeHtml(text("settingsProfileEmpty"))}</div></td></tr>`}</tbody></table></div>${state.data.adminUserProfileDeleteId ? `<div role="alert">${escapeHtml(text("settingsProfileDeleteConfirm"))}<div class="actions">${button(text("adminDelete"), { action: "admin-settings-profile-delete-confirm", danger: true, busy: state.busy === "admin-settings-profile-delete" })}<button class="secondary-button" type="button" data-action="admin-settings-profile-cancel">${escapeHtml(text("cancel"))}</button></div></div>` : ""}</section>${editor}`;
+}
+
+function adminSettingsLocalizationContent() {
+  const tabs = [
+    ["settings", "adminLocalizationSettings"],
+    ["overrides", "adminMessageOverrides"],
+    ["effective", "adminEffectiveMessages"],
+  ];
+  const active = tabs.some(([key]) => key === state.data.adminSettingsLocalizationTab)
+    ? state.data.adminSettingsLocalizationTab
+    : "settings";
+  const tabBar = `<nav class="admin-user-detail-tabs admin-settings-subtabs" role="tablist" aria-label="${escapeHtml(text("adminLocalization"))}">${tabs.map(([key, label]) => `<button type="button" role="tab" class="admin-user-detail-tab ${active === key ? "is-active" : ""}" id="admin-settings-localization-${key}" aria-selected="${active === key}" aria-controls="admin-settings-localization-panel" tabindex="${active === key ? "0" : "-1"}" data-action="admin-settings-localization-tab" data-tab="${key}">${escapeHtml(text(label))}</button>`).join("")}</nav>`;
+  const combined = adminAdminLocalizationContent();
+  const settingsForm = combined.match(/<form data-form="admin-localization-settings"[\s\S]*?<\/form>/)?.[0] ?? "";
+  const cards = [...combined.matchAll(/<section class="card" aria-label="[^"]+">[\s\S]*?<\/section>/g)].map((match) => match[0]);
+  const body = active === "settings"
+    ? `<section class="card"><h2>${escapeHtml(text("adminLocalizationSettings"))}</h2><p class="muted">${escapeHtml(text("adminLocalizationDescription"))}</p>${settingsForm}</section>`
+    : active === "overrides"
+      ? cards[1] ?? combined
+      : adminSettingsEffectiveMessagesContent();
+  return `${tabBar}<section id="admin-settings-localization-panel" role="tabpanel" aria-labelledby="admin-settings-localization-${active}" class="admin-settings-panel">${body}</section>`;
+}
+
+function adminSettingsEffectiveMessagesContent() {
+  const locale = state.data.adminSettingsEffectiveLocale === "tr" ? "tr" : "en";
+  const query = String(state.data.adminSettingsEffectiveQuery ?? "").trim().toLowerCase();
+  const entries = Object.entries(messages[locale] ?? {})
+    .filter(([key, value]) => `${key} ${String(value)}`.toLowerCase().includes(query))
+    .sort(([left], [right]) => left.localeCompare(right));
+  const rows = entries.map(([key, value]) => `<tr><td><code>${escapeHtml(key)}</code></td><td>${escapeHtml(value)}</td></tr>`).join("");
+  return `<section class="card"><h2>${escapeHtml(text("adminEffectiveMessages"))}</h2><p class="muted">${escapeHtml(text("adminEffectiveMessagesDescription"))}</p><div class="form-grid"><div class="field"><label for="admin-settings-effective-locale">${escapeHtml(text("adminLanguage"))}</label><select id="admin-settings-effective-locale"><option value="en" ${locale === "en" ? "selected" : ""}>English</option><option value="tr" ${locale === "tr" ? "selected" : ""}>Türkçe</option></select></div><div class="field"><label for="admin-settings-effective-search">${escapeHtml(text("adminSearch"))}</label><input id="admin-settings-effective-search" type="search" value="${escapeHtml(query)}" maxlength="200"/></div></div><div class="admin-session-count" role="status">${entries.length} ${escapeHtml(text("adminRecords"))}</div><div class="admin-session-table-scroll"><table class="admin-session-table"><thead><tr><th>${escapeHtml(text("adminMessageKey"))}</th><th>${escapeHtml(text("adminMessageValue"))}</th></tr></thead><tbody>${rows || `<tr><td colspan="2"><div class="empty" role="status">${escapeHtml(text("adminNoMessageOverrides"))}</div></td></tr>`}</tbody></table></div></section>`;
 }
 
 function adminAdminConfigurationContent() {
@@ -5221,7 +5377,7 @@ function adminAdminLocalizationContent() {
       ...overrides.map((item) => item.bundle).filter(Boolean),
     ]),
   ];
-  const localizationSettingsForm = `<form data-form="admin-localization-settings" novalidate><label class="settings-row"><input type="checkbox" name="internationalizationEnabled" ${localizationDraft.internationalizationEnabled ? "checked" : ""}/>${escapeHtml(text("adminLocalizationEnabled"))}</label><div class="field"><label for="localizationDefaultLocale">${escapeHtml(text("adminDefaultLocale"))}</label><select id="localizationDefaultLocale" name="defaultLocale">${availableLocales.map((locale) => '<option value="' + escapeHtml(locale) + '" ' + (localizationDraft.defaultLocale === locale ? "selected" : "") + ">" + escapeHtml(locale) + "</option>").join("")}</select><div class="field-error">${escapeHtml(errors.defaultLocale ?? "")}</div></div><fieldset class="field"><legend>${escapeHtml(text("adminSupportedLocales"))}</legend>${availableLocales.map((locale) => '<label class="settings-row"><input type="checkbox" name="supportedLocales" value="' + escapeHtml(locale) + '" ' + (supportedLocales.includes(locale) ? "checked" : "") + "/>" + escapeHtml(locale) + "</label>").join("")}<div class="field-error">${escapeHtml(errors.supportedLocales ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-localization-settings", disabled: state.offline })}</div></form>`;
+  const localizationSettingsForm = `<form data-form="admin-localization-settings" novalidate>${settingsSwitch("internationalizationEnabled", "adminLocalizationEnabled", localizationDraft.internationalizationEnabled)}<div class="field"><label for="localizationDefaultLocale">${escapeHtml(text("adminDefaultLocale"))}</label><select id="localizationDefaultLocale" name="defaultLocale">${availableLocales.map((locale) => '<option value="' + escapeHtml(locale) + '" ' + (localizationDraft.defaultLocale === locale ? "selected" : "") + ">" + escapeHtml(locale) + "</option>").join("")}</select><div class="field-error">${escapeHtml(errors.defaultLocale ?? "")}</div></div><fieldset class="field"><legend>${escapeHtml(text("adminSupportedLocales"))}</legend>${availableLocales.map((locale) => settingsSwitch("supportedLocales", locale, supportedLocales.includes(locale), locale)).join("")}<div class="field-error">${escapeHtml(errors.supportedLocales ?? "")}</div></fieldset><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === "admin-localization-settings", disabled: state.offline })}</div></form>`;
   const overrideField = (item, name, label, value, error) => {
     const id = `override-${item.id}-${name}`;
     return `<div class="field"><label for="${id}">${escapeHtml(label)}</label><input id="${id}" name="${name}" value="${escapeHtml(value ?? "")}" aria-invalid="${Boolean(error)}" required maxlength="${
@@ -5932,7 +6088,7 @@ async function searchUsers() {
 
 function render({ preserveDrafts = true } = {}) {
   const searchInput =
-    /^(admin-user-query|admin-client-query|admin-role-query|role-users-query|role-candidate-(realm|client|user)|role-name|role-description|group-(name|attributesJson|candidate-query|query)|groupMember-query)$/.test(
+    /^(admin-settings-profile-query|admin-user-query|admin-client-query|admin-role-query|role-users-query|role-candidate-(realm|client|user)|role-name|role-description|group-(name|attributesJson|candidate-query|query)|groupMember-query)$/.test(
       document.activeElement?.id ?? "",
     )
       ? document.activeElement
@@ -6014,6 +6170,41 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
         health.status === "fulfilled" && health.value?.status === "UP"
           ? "UP"
           : "DOWN";
+    }
+    if (state.console === "admin" && state.route === "configuration") {
+      const requests = await Promise.allSettled([
+        request("/api/admin/server-info"),
+        request("/api/admin/settings/login"),
+        request("/api/admin/settings/registration-captcha"),
+        request("/api/admin/settings/social-providers"),
+        request("/api/admin/settings/ldap"),
+        request("/api/admin/settings/email"),
+        request("/api/admin/events/config"),
+        request("/api/admin/settings/ciba-policy"),
+        request("/api/admin/settings/offline-access"),
+        request("/api/admin/settings/localization"),
+        request("/api/admin/settings/localization/messages?page=0&size=20&sort=locale,asc"),
+        request("/api/admin/settings/branding"),
+        request("/api/admin/settings/user-profile/page?q=&page=0&size=20&sort=displayOrder,asc"),
+      ]);
+      const keys = [
+        "adminServerInfo", "adminLoginSettings", "adminRegistrationCaptcha",
+        "adminSocialProviders", "adminLdapProviders", "adminEmailSettings",
+        "adminEventsConfig", "cibaPolicy", "offlineAccessPolicy",
+        "adminLocalization", "adminMessageOverrides", "adminBranding",
+        "adminUserProfileDefinitions",
+      ];
+      const sections = [
+        "general", "login", "login", "social-login", "user-federation",
+        "email", "events", "ciba-policy", "offline-access", "localization",
+        "localization", "branding", "user-profile",
+      ];
+      state.data.adminSettingsLoadErrors = {};
+      requests.forEach((result, index) => {
+        if (result.status === "fulfilled") state.data[keys[index]] = result.value;
+        else state.data.adminSettingsLoadErrors[sections[index]] = true;
+      });
+      state.data.adminSettingsSection ??= "general";
     }
     if (state.route === "notifications") {
       const base =
@@ -6966,6 +7157,141 @@ async function submitForm(form) {
   }
   if (state.busy) return;
   const values = formValues(form);
+  const checkbox = (name) => form.elements.namedItem(name)?.checked === true;
+  if (["admin-settings-login", "admin-settings-brute-force", "admin-settings-sessions"].includes(form.dataset.form)) {
+    if (state.offline || state.data.adminAccess?.isAdmin !== true || !form.reportValidity()) return;
+    const current = state.data.adminLoginSettings ?? {};
+    const body = { ...current, ...values };
+    for (const name of ["userRegistration", "forgotPassword", "rememberMe", "passkeys", "loginWithEmail", "verifyEmail", "otpEnabled", "otpRequired", "bruteForceEnabled", "bruteForcePermanentLockout"]) {
+      if (form.elements.namedItem(name)) body[name] = checkbox(name);
+    }
+    for (const name of ["passwordResetTokenLifespanSeconds", "passwordResetResendCooldownSeconds", "emailUpdateReauthenticationMinutes", "sessionTimeoutMinutes", "passwordMinimumLength", "bruteForceMaxFailures", "bruteForceMaxSecondaryFailures", "mfaVerificationTimeoutSeconds", "bruteForceQuickLoginWindowMillis", "bruteForceMinimumQuickLoginWaitSeconds", "bruteForceWaitIncrementSeconds", "bruteForceMaxWaitSeconds", "bruteForceFailureResetTimeSeconds", "bruteForceMaxTemporaryLockouts", "bruteForceIpRequestsPerMinute", "bruteForceUsernameIpRequestsPerMinute"]) {
+      if (form.elements.namedItem(name)) body[name] = Number(values[name]);
+    }
+    if (body.otpRequired && !body.otpEnabled) {
+      state.data.adminSettingsLoginDraft = body;
+      state.data.adminSettingsValidationMessage = text("adminOtpRequiredNeedsEnabled");
+      render();
+      return;
+    }
+    state.data.adminSettingsLoginDraft = null;
+    state.data.adminSettingsValidationMessage = null;
+    state.busy = form.dataset.form;
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.adminLoginSettings = await request("/api/admin/settings/login", { method: "PUT", body });
+      state.notice = text("adminLoginPolicySaved");
+    } catch { /* The shared request handler exposes localized validation errors. */ }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-settings-social") {
+    if (state.offline || state.data.adminAccess?.isAdmin !== true || !form.reportValidity()) return;
+    const currentLogin = state.data.adminLoginSettings ?? {};
+    const loginBody = { ...currentLogin };
+    const providers = ["google", "github", "linkedin", "microsoft"].map((provider) => {
+      const current = (state.data.adminSocialProviders ?? []).find((item) => item.provider === provider) ?? { provider };
+      const read = (suffix) => String(values[`${provider}${suffix}`] ?? "");
+      loginBody[`${provider}LoginEnabled`] = checkbox(`${provider}LoginEnabled`);
+      return {
+        provider,
+        alias: read("Alias") || provider,
+        hideOnLogin: checkbox(`${provider}HideOnLogin`),
+        accountLinkingOnly: checkbox(`${provider}AccountLinkingOnly`),
+        trustEmail: checkbox(`${provider}TrustEmail`),
+        mfaRequired: checkbox(`${provider}MfaRequired`),
+        requiredClaims: read("RequiredClaims") || "sub",
+        storeTokens: checkbox(`${provider}StoreTokens`),
+        storedTokensReadable: checkbox(`${provider}StoredTokensReadable`),
+        guiOrder: Number(read("Order") || 0),
+        showInAccountConsole: current.showInAccountConsole ?? "always",
+        clientId: read("ClientId"),
+        clientSecret: read("ClientSecret"),
+      };
+    });
+    state.busy = "admin-settings-social";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.adminLoginSettings = await request("/api/admin/settings/login", { method: "PUT", body: loginBody });
+      state.data.adminSocialProviders = await request("/api/admin/settings/social-providers", { method: "PUT", body: { providers } });
+      state.notice = text("adminLoginPolicySaved");
+    } catch { /* The shared request handler exposes localized validation errors. */ }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-settings-captcha") {
+    if (state.offline || state.data.adminAccess?.isAdmin !== true || !form.reportValidity()) return;
+    const captchaBody = {
+      enabled: checkbox("enabled"),
+      provider: values.provider === "enterprise" ? "enterprise" : "recaptcha",
+      siteKey: String(values.siteKey ?? ""),
+      projectId: String(values.projectId ?? ""),
+      action: String(values.action ?? "register"),
+      recaptchaV3: checkbox("recaptchaV3"),
+      scoreThreshold: Number(values.scoreThreshold),
+      useRecaptchaNet: checkbox("useRecaptchaNet"),
+      secretKey: String(values.secretKey ?? ""),
+      apiKey: String(values.apiKey ?? ""),
+      loginEnabled: checkbox("loginEnabled"),
+      loginAction: String(values.loginAction ?? "login"),
+      loginRecaptchaV3: checkbox("loginRecaptchaV3"),
+      loginScoreThreshold: Number(values.loginScoreThreshold),
+    };
+    state.busy = "admin-settings-captcha";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.adminRegistrationCaptcha = await request("/api/admin/settings/registration-captcha", { method: "PUT", body: captchaBody });
+      state.notice = text("settingsCaptchaSaved");
+    } catch { /* The shared request handler exposes localized validation errors. */ }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-settings-events") {
+    if (state.offline || state.data.adminAccess?.manageEvents !== true || !form.reportValidity()) return;
+    const body = {
+      eventsEnabled: checkbox("eventsEnabled"),
+      adminEventsEnabled: checkbox("adminEventsEnabled"),
+      adminEventsDetailsEnabled: checkbox("adminEventsDetailsEnabled"),
+      eventsExpirationDays: Number(values.eventsExpirationDays),
+    };
+    state.busy = "admin-settings-events";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.adminEventsConfig = await request("/api/admin/events/config", { method: "PUT", body });
+      state.notice = text("settingsSaveEvents");
+    } catch { /* The shared request handler exposes localized validation errors. */ }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "admin-settings-profile") {
+    if (state.offline || state.data.adminAccess?.isAdmin !== true || !form.reportValidity()) return;
+    const current = state.data.adminUserProfileDraft ?? {};
+    const body = { ...current, ...values, required: checkbox("required"), multivalued: checkbox("multivalued"), enabled: checkbox("enabled"), displayOrder: Number(values.displayOrder), minLength: values.minLength === "" ? null : Number(values.minLength), maxLength: values.maxLength === "" ? null : Number(values.maxLength) };
+    state.busy = "admin-settings-profile";
+    render();
+    try {
+      const path = body.id ? `/api/admin/settings/user-profile/${body.id}` : "/api/admin/settings/user-profile";
+      await request(path, { method: body.id ? "PUT" : "POST", body });
+      state.data.adminUserProfileDraft = null;
+      state.data.adminUserProfileDefinitions = await request("/api/admin/settings/user-profile/page?q=&page=0&size=20&sort=displayOrder,asc");
+      state.notice = text("settingsProfileSaved");
+    } catch { /* The request handler exposes a localized API error. */ }
+    state.busy = null;
+    render();
+    return;
+  }
   if (form.dataset.form === "admin-auth-flow") {
     if (
       state.offline ||
@@ -9625,6 +9951,86 @@ async function submitForm(form) {
 }
 
 async function action(action, element) {
+  if (action === "admin-settings-tab") {
+    if (state.busy) return;
+    const tab = element.dataset.tab;
+    if (!adminSettingsTabs.some(([key]) => key === tab)) return;
+    state.data.adminSettingsSection = tab;
+    state.error = null;
+    state.notice = null;
+    render();
+    document.getElementById(`admin-settings-tab-${tab}`)?.focus();
+    return;
+  }
+  if (action === "admin-settings-localization-tab") {
+    if (state.busy || !["settings", "overrides", "effective"].includes(element.dataset.tab)) return;
+    state.data.adminSettingsLocalizationTab = element.dataset.tab;
+    render();
+    document.getElementById(`admin-settings-localization-${element.dataset.tab}`)?.focus();
+    return;
+  }
+  if (action === "admin-settings-profile-create") {
+    state.data.adminUserProfileDraft = { name: "", displayName: "", description: "", type: "STRING", required: false, multivalued: false, enabled: true, displayOrder: 0 };
+    render();
+    return;
+  }
+  if (action === "admin-settings-profile-edit") {
+    const item = (state.data.adminUserProfileDefinitions?.content ?? []).find((entry) => String(entry.id) === element.dataset.id);
+    if (!item) return;
+    state.data.adminUserProfileDraft = { ...item };
+    render();
+    return;
+  }
+  if (action === "admin-settings-profile-delete") {
+    state.data.adminUserProfileDeleteId = Number(element.dataset.id);
+    render();
+    return;
+  }
+  if (action === "admin-settings-profile-cancel") {
+    state.data.adminUserProfileDraft = null;
+    state.data.adminUserProfileDeleteId = null;
+    render();
+    return;
+  }
+  if (action === "admin-settings-profile-delete-confirm") {
+    if (state.offline || state.data.adminAccess?.isAdmin !== true || !Number.isSafeInteger(state.data.adminUserProfileDeleteId)) return;
+    state.busy = "admin-settings-profile-delete";
+    render();
+    try {
+      await request(`/api/admin/settings/user-profile/${state.data.adminUserProfileDeleteId}`, { method: "DELETE" });
+      state.data.adminUserProfileDeleteId = null;
+      state.data.adminUserProfileDefinitions = await request("/api/admin/settings/user-profile/page?q=&page=0&size=20&sort=displayOrder,asc");
+      state.notice = text("settingsProfileDeleted");
+    } catch { /* The request handler exposes a localized API error. */ }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "admin-settings-email-test") {
+    const form = element.closest("form");
+    if (!form || state.busy || state.offline || !form.reportValidity()) return;
+    const values = formValues(form);
+    const body = {
+      ...values,
+      enabled: form.elements.namedItem("enabled").checked,
+      port: Number(values.port),
+      smtpAuth: form.elements.namedItem("smtpAuth").checked,
+      starttls: form.elements.namedItem("starttls").checked,
+      ssl: form.elements.namedItem("ssl").checked,
+    };
+    state.busy = "admin-settings-email-test";
+    state.error = null;
+    render();
+    try {
+      await request("/api/admin/settings/email/test", { method: "POST", body });
+      state.notice = text("settingsEmailTestSucceeded");
+    } catch {
+      /* The shared request handler exposes localized transport and validation errors. */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (action === "admin-auth-flow-page") {
     if (state.busy) return;
     const page = Number(element.dataset.page);
@@ -13913,6 +14319,42 @@ async function action(action, element) {
 }
 
 function bind() {
+  document.querySelectorAll(".admin-settings-tabs [role=tab]").forEach((tab) => {
+    tab.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      const tabs = [...document.querySelectorAll(".admin-settings-tabs [role=tab]")];
+      const current = tabs.indexOf(tab);
+      if (current < 0 || tabs.length < 2) return;
+      event.preventDefault();
+      const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].click();
+    });
+  });
+  document.querySelectorAll(".admin-settings-subtabs [role=tab]").forEach((tab) => {
+    tab.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      const tabs = [...document.querySelectorAll(".admin-settings-subtabs [role=tab]")];
+      const current = tabs.indexOf(tab);
+      if (current < 0 || tabs.length < 2) return;
+      event.preventDefault();
+      const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].click();
+    });
+  });
+  document.getElementById("admin-settings-effective-locale")?.addEventListener("change", (event) => {
+    state.data.adminSettingsEffectiveLocale = event.currentTarget.value === "tr" ? "tr" : "en";
+    render();
+  });
+  document.getElementById("admin-settings-effective-search")?.addEventListener("change", (event) => {
+    state.data.adminSettingsEffectiveQuery = String(event.currentTarget.value ?? "").slice(0, 200);
+    render();
+  });
+  document.querySelector('[data-input="admin-settings-profile-search"]')?.addEventListener("input", (event) => {
+    state.data.adminUserProfileQuery = event.currentTarget.value;
+    render();
+    const search = document.querySelector('[data-input="admin-settings-profile-search"]');
+    search?.focus();
+  });
   document.querySelectorAll(".scope-menu").forEach((menu) => {
     menu.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {

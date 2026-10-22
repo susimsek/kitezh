@@ -458,6 +458,227 @@ test("native Authentication mirrors policy tabs and saves through the existing s
   }
 });
 
+test("native Administration Settings follows the Web tab order and exposes the matching sub-tabs", async () => {
+  const harness = await renderConsole("admin", {
+    messages: {
+      en: {
+        adminNavSettings: "Settings",
+        settingsGeneral: "General",
+        settingsLogin: "Login",
+        settingsSocialLogin: "Social login",
+        settingsUserFederation: "User federation",
+        settingsEmail: "Email",
+        settingsBruteForce: "Brute force",
+        adminSessions: "Sessions",
+        adminEvents: "Events",
+        adminCibaPolicy: "CIBA policy",
+        settingsOfflineAccess: "Offline access",
+        settingsUserProfile: "User profile",
+        adminLocalization: "Localization",
+        adminBranding: "Branding",
+        adminLocalizationSettings: "Settings",
+        adminMessageOverrides: "Message overrides",
+        adminEffectiveMessages: "Effective messages",
+        adminEffectiveMessagesDescription: "Resolved localized messages.",
+        adminLanguage: "Language",
+        adminSearch: "Search",
+        adminMessageKey: "Message key",
+        adminMessageValue: "Message value",
+        adminRecords: "records",
+        adminNoMessageOverrides: "No message overrides.",
+      },
+      tr: {},
+    },
+  });
+  harness.setResponse("/api/admin/server-info", "GET", () => ({ issuer: "https://issuer.test" }));
+  harness.setResponse("/api/admin/settings/login", "GET", () => ({ userRegistration: true }));
+  harness.setResponse("/api/admin/settings/registration-captcha", "GET", () => ({ enabled: false }));
+  harness.setResponse("/api/admin/settings/social-providers", "GET", () => []);
+  harness.setResponse("/api/admin/settings/ldap", "GET", () => []);
+  harness.setResponse("/api/admin/settings/email", "GET", () => ({ enabled: false }));
+  harness.setResponse("/api/admin/events/config", "GET", () => ({ eventsEnabled: true }));
+  harness.setResponse("/api/admin/settings/ciba-policy", "GET", () => ({}));
+  harness.setResponse("/api/admin/settings/offline-access", "GET", () => ({}));
+  harness.setResponse("/api/admin/settings/localization", "GET", () => ({ internationalizationEnabled: true }));
+  harness.setResponse("/api/admin/settings/localization/messages?page=0&size=20&sort=locale,asc", "GET", () => ({ content: [] }));
+  harness.setResponse("/api/admin/settings/branding", "GET", () => ({}));
+  harness.setResponse("/api/admin/settings/user-profile/page?q=&page=0&size=20&sort=displayOrder,asc", "GET", () => ({ content: [] }));
+  harness.setResponse("/api/admin/settings/user-profile", "POST", ({ body }) => ({ id: 3, ...body }));
+
+  try {
+    const { document } = harness;
+    await settle();
+    document.querySelector('[data-route="configuration"]').click();
+    await settle();
+    assert.deepEqual(
+      [...document.querySelectorAll(".admin-settings-tabs [role=tab]")].map((tab) => tab.textContent),
+      ["General", "Login", "Social login", "User federation", "Email", "Brute force", "Sessions", "Events", "CIBA policy", "Offline access", "User profile", "Localization", "Branding"],
+    );
+    assert.match(document.querySelector(".admin-settings-panel").textContent, /https:\/\/issuer\.test/);
+    document.querySelector('[data-action="admin-settings-tab"][data-tab="login"]').click();
+    assert.ok(document.querySelector('[data-form="admin-settings-captcha"]'));
+    assert.ok(document.querySelectorAll('.admin-settings-panel .native-settings-switch input[role="switch"]').length > 0);
+    assert.equal(document.querySelector('.admin-settings-panel .native-settings-switch-control')?.parentElement?.classList.contains("native-settings-switch"), true);
+    document.querySelector('[data-action="admin-settings-tab"][data-tab="social-login"]').click();
+    assert.equal(document.querySelectorAll('.admin-settings-panel fieldset').length, 4);
+    document.querySelector('[data-action="admin-settings-tab"][data-tab="localization"]').click();
+    assert.deepEqual(
+      [...document.querySelectorAll(".admin-settings-subtabs [role=tab]")].map((tab) => tab.textContent),
+      ["Settings", "Message overrides", "Effective messages"],
+    );
+    document.querySelector('[data-action="admin-settings-localization-tab"][data-tab="effective"]').click();
+    assert.ok(document.querySelector("#admin-settings-effective-locale"));
+    await openAdminSettingsTab(document, "user-profile");
+    document.querySelector('[data-action="admin-settings-profile-create"]').click();
+    const profileForm = document.querySelector('[data-form="admin-settings-profile"]');
+    assert.ok(profileForm);
+    profileForm.elements.namedItem("name").value = "preferredName";
+    profileForm.elements.namedItem("displayName").value = "Preferred name";
+    profileForm.dispatchEvent(new document.defaultView.Event("submit", { bubbles: true, cancelable: true }));
+    await settle();
+    assert.ok(harness.calls.some(({ path, method, body }) => path === "/api/admin/settings/user-profile" && method === "POST" && body.name === "preferredName"));
+    for (const tab of ["general", "login", "social-login", "user-federation", "email", "brute-force", "sessions", "events", "ciba-policy", "offline-access", "user-profile", "localization", "branding"]) {
+      await openAdminSettingsTab(document, tab);
+      assert.equal(
+        document.querySelectorAll('.admin-settings-panel input[type="checkbox"]:not([role="switch"])').length,
+        0,
+        `The ${tab} Settings tab should render boolean controls as switches`,
+      );
+    }
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native Administration Settings submits Web settings actions and handles profile and locale navigation", async () => {
+  const harness = await renderConsole("admin");
+  const profile = {
+    id: 7,
+    name: "displayName",
+    displayName: "Display name",
+    description: "Shown to users",
+    type: "STRING",
+    required: false,
+    multivalued: false,
+    enabled: true,
+    displayOrder: 1,
+  };
+  harness.setResponse("/api/admin/settings/login", "GET", () => ({}));
+  harness.setResponse("/api/admin/settings/registration-captcha", "GET", () => ({}));
+  harness.setResponse("/api/admin/settings/social-providers", "GET", () => []);
+  harness.setResponse("/api/admin/settings/email", "GET", () => ({}));
+  harness.setResponse("/api/admin/events/config", "GET", () => ({}));
+  harness.setResponse("/api/admin/settings/localization", "GET", () => ({ internationalizationEnabled: true }));
+  harness.setResponse("/api/admin/settings/localization/messages?page=0&size=20&sort=locale,asc", "GET", () => ({ content: [] }));
+  let profileReads = 0;
+  harness.setResponse("/api/admin/settings/user-profile/page?q=&page=0&size=20&sort=displayOrder,asc", "GET", () => ({ content: profileReads++ === 0 ? [profile] : [] }));
+  harness.setResponse("/api/admin/settings/user-profile/7", "DELETE", () => ({}));
+  try {
+    const { calls, document } = harness;
+    document.defaultView.confirm = () => true;
+    await settle();
+    document.querySelector('[data-route="configuration"]').click();
+    await settle();
+
+    const submitSettings = async (tab, formSelector, savePath) => {
+      await openAdminSettingsTab(document, tab);
+      const form = document.querySelector(formSelector);
+      assert.ok(form, `${tab} form should render`);
+      form.reportValidity = () => true;
+      if (tab === "events") form.elements.namedItem("eventsExpirationDays").value = "365";
+      form.dispatchEvent(new document.defaultView.Event("submit", { bubbles: true, cancelable: true }));
+      await settle();
+      assert.ok(calls.some(({ path, method }) => path === savePath && method === "PUT"), `${tab} settings should save; calls: ${JSON.stringify(calls.slice(-8))}`);
+    };
+
+    await submitSettings("social-login", '[data-form="admin-settings-social"]', "/api/admin/settings/social-providers");
+    assert.ok(calls.some(({ path, method }) => path === "/api/admin/settings/login" && method === "PUT"));
+    await openAdminSettingsTab(document, "login");
+    const loginPolicyForm = document.querySelector('[data-form="admin-settings-login"]');
+    assert.ok(loginPolicyForm);
+    loginPolicyForm.reportValidity = () => true;
+    loginPolicyForm.elements.namedItem("otpRequired").checked = true;
+    loginPolicyForm.dispatchEvent(new document.defaultView.Event("submit", { bubbles: true, cancelable: true }));
+    await settle();
+    const invalidLoginPolicyForm = document.querySelector('[data-form="admin-settings-login"]');
+    assert.ok(invalidLoginPolicyForm);
+    invalidLoginPolicyForm.reportValidity = () => true;
+    invalidLoginPolicyForm.elements.namedItem("otpRequired").checked = false;
+    invalidLoginPolicyForm.dispatchEvent(new document.defaultView.Event("submit", { bubbles: true, cancelable: true }));
+    await settle();
+    assert.ok(calls.some(({ path, method }) => path === "/api/admin/settings/login" && method === "PUT"));
+    await submitSettings("login", '[data-form="admin-settings-captcha"]', "/api/admin/settings/registration-captcha");
+    await submitSettings("events", '[data-form="admin-settings-events"]', "/api/admin/events/config");
+
+    await openAdminSettingsTab(document, "email");
+    const emailForm = document.querySelector('[data-form="admin-email-settings"]');
+    assert.ok(emailForm);
+    emailForm.elements.namedItem("fromAddress").value = "admin@example.test";
+    emailForm.elements.namedItem("baseUrl").value = "https://example.test";
+    emailForm.elements.namedItem("host").value = "smtp.example.test";
+    emailForm.elements.namedItem("port").value = "587";
+    emailForm.reportValidity = () => true;
+    harness.setResponse("/api/admin/settings/email/test", "POST", () => { throw new Error("SMTP connection failed"); });
+    document.querySelector('[data-action="admin-settings-email-test"]').click();
+    await settle();
+    assert.equal(calls.filter(({ path, method }) => path === "/api/admin/settings/email/test" && method === "POST").length, 1);
+
+    await openAdminSettingsTab(document, "user-profile");
+    document.querySelector('[data-action="admin-settings-profile-edit"][data-id="7"]').click();
+    assert.ok(document.querySelector('[data-form="admin-settings-profile"]'));
+    document.querySelector('[data-action="admin-settings-profile-cancel"]').click();
+    document.querySelector('[data-action="admin-settings-profile-delete"][data-id="7"]').click();
+    document.querySelector('[data-action="admin-settings-profile-delete-confirm"]').click();
+    await settle();
+    assert.ok(calls.some(({ path, method }) => path === "/api/admin/settings/user-profile/7" && method === "DELETE"));
+
+    await openAdminSettingsTab(document, "localization");
+    document.querySelector('[data-action="admin-settings-localization-tab"][data-tab="settings"]').click();
+    document.querySelector('[data-action="admin-settings-localization-tab"][data-tab="overrides"]').click();
+    document.querySelector('[data-action="admin-settings-localization-tab"][data-tab="effective"]').click();
+    document.querySelector("#admin-settings-effective-locale").dispatchEvent(new document.defaultView.Event("change", { bubbles: true }));
+    document.querySelector("#admin-settings-effective-search").dispatchEvent(new document.defaultView.Event("change", { bubbles: true }));
+    const exerciseTabs = (selector) => {
+      for (const key of ["ArrowRight", "ArrowLeft", "Home", "End"]) {
+        const tab = document.querySelector(selector);
+        tab.dispatchEvent(new document.defaultView.KeyboardEvent("keydown", { key, bubbles: true }));
+      }
+    };
+    exerciseTabs(".admin-settings-subtabs [role=tab]");
+    exerciseTabs(".admin-settings-tabs [role=tab]");
+    await openAdminSettingsTab(document, "user-profile");
+    const profileSearch = document.querySelector('[data-input="admin-settings-profile-search"]');
+    profileSearch.value = "display";
+    profileSearch.dispatchEvent(new document.defaultView.Event("input", { bubbles: true }));
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native email test connection reports success from its settings form", async () => {
+  const harness = await renderConsole("admin");
+  harness.setResponse("/api/admin/settings/login", "GET", () => ({}));
+  harness.setResponse("/api/admin/settings/email", "GET", () => ({}));
+  try {
+    const { calls, document } = harness;
+    await settle();
+    document.querySelector('[data-route="configuration"]').click();
+    await settle();
+    await openAdminSettingsTab(document, "email");
+    const form = document.querySelector('[data-form="admin-email-settings"]');
+    form.elements.namedItem("fromAddress").value = "admin@example.test";
+    form.elements.namedItem("baseUrl").value = "https://example.test";
+    form.elements.namedItem("host").value = "smtp.example.test";
+    form.elements.namedItem("port").value = "587";
+    form.reportValidity = () => true;
+    document.querySelector('[data-action="admin-settings-email-test"]').click();
+    await settle();
+    assert.ok(calls.some(({ path, method }) => path === "/api/admin/settings/email/test" && method === "POST"));
+  } finally {
+    harness.restore();
+  }
+});
+
 test("native built-in flow settings keep Web's editable save action and submit only flow fields", async () => {
   const harness = await renderConsole("admin");
   const flow = {
@@ -1190,6 +1411,20 @@ async function openClientTab(document, tab) {
     await settle();
   }
 }
+
+async function openAdminSettingsTab(document, tab) {
+  const settingsRoute = document.querySelector('[data-route="configuration"]');
+  if (settingsRoute.getAttribute("aria-current") !== "page") {
+    settingsRoute.click();
+    await settle();
+  }
+  const sectionTab = document.querySelector(
+    `[data-action="admin-settings-tab"][data-tab="${tab}"]`,
+  );
+  assert.ok(sectionTab, `Settings should include the ${tab} tab`);
+  sectionTab.click();
+  await settle();
+}
 test("native Admin renderer covers every authorized primary route", async () => {
   const harness = await renderConsole("admin");
   harness.setResponse("/api/admin/whoami", "GET", () => ({
@@ -1245,11 +1480,7 @@ test("native Admin renderer covers every authorized primary route", async () => 
       "offline-sessions",
       "events",
       "keys",
-      "policies",
       "configuration",
-      "login-email",
-      "localization",
-      "ldap",
       "authentication",
     ];
     for (const route of routes) {
@@ -2597,12 +2828,8 @@ test("native Admin localization settings save asynchronously without duplicate s
   );
   try {
     const { calls, document } = harness;
-    document.querySelector('[data-route="localization"]').click();
-    for (let turn = 0; turn < 30; turn += 1) {
-      await settle();
-      if (!document.querySelector('[data-route="localization"]').disabled)
-        break;
-    }
+    await openAdminSettingsTab(document, "localization");
+    document.querySelector('[data-action="admin-settings-localization-tab"][data-tab="settings"]').click();
     const form = document.querySelector(
       '[data-form="admin-localization-settings"]',
     );
@@ -2652,7 +2879,7 @@ test("native Admin localization settings save asynchronously without duplicate s
 });
 test("native Admin login policy requires OTP before it can be mandatory", async () => {
   const harness = await renderConsole("admin");
-  harness.setResponse("/api/admin/settings/login/native", "GET", () => ({
+  harness.setResponse("/api/admin/settings/login", "GET", () => ({
     sessionTimeoutMinutes: 30,
     passwordMinimumLength: 12,
     bruteForceMaxFailures: 5,
@@ -2668,12 +2895,8 @@ test("native Admin login policy requires OTP before it can be mandatory", async 
   }));
   try {
     const { calls, document } = harness;
-    document.querySelector('[data-route="login-email"]').click();
-    for (let turn = 0; turn < 30; turn += 1) {
-      await settle();
-      if (!document.querySelector('[data-route="login-email"]').disabled) break;
-    }
-    const form = document.querySelector('[data-form="admin-login-settings"]');
+    await openAdminSettingsTab(document, "login");
+    const form = document.querySelector('[data-form="admin-settings-login"]');
     assert.ok(form);
     form.elements.namedItem("sessionTimeoutMinutes").value = "30";
     form.elements.namedItem("passwordMinimumLength").value = "12";
@@ -2689,14 +2912,17 @@ test("native Admin login policy requires OTP before it can be mandatory", async 
     assert.equal(
       calls.some(
         ({ path, method }) =>
-          path === "/api/admin/settings/login/native" && method === "PUT",
+          path === "/api/admin/settings/login" && method === "PUT",
       ),
       false,
       "mandatory OTP must not be sent while OTP is disabled",
     );
-    assert.match(document.querySelector('[role="alert"]').textContent, /OTP/i);
+    assert.match(
+      document.querySelector('[data-form="admin-settings-login"]')?.parentElement?.querySelector('[role="alert"]')?.textContent ?? "",
+      /OTP/i,
+    );
     const updatedForm = document.querySelector(
-      '[data-form="admin-login-settings"]',
+      '[data-form="admin-settings-login"]',
     );
     updatedForm.elements.namedItem("otpEnabled").checked = true;
     updatedForm.dispatchEvent(
@@ -2708,7 +2934,7 @@ test("native Admin login policy requires OTP before it can be mandatory", async 
     await settle();
     const save = calls.find(
       ({ path, method }) =>
-        path === "/api/admin/settings/login/native" && method === "PUT",
+        path === "/api/admin/settings/login" && method === "PUT",
     );
     assert.ok(save);
     assert.equal(save.body.otpEnabled, true);
@@ -2720,7 +2946,7 @@ test("native Admin login policy requires OTP before it can be mandatory", async 
 });
 test("native Admin email settings preserve the configured username and clear the secret draft", async () => {
   const harness = await renderConsole("admin");
-  harness.setResponse("/api/admin/settings/login/native", "GET", () => ({}));
+  harness.setResponse("/api/admin/settings/login", "GET", () => ({}));
   harness.setResponse("/api/admin/settings/email", "GET", () => ({
     enabled: true,
     fromAddress: "auth@example.test",
@@ -2739,14 +2965,10 @@ test("native Admin email settings preserve the configured username and clear the
   }));
   try {
     const { calls, document } = harness;
-    document.querySelector('[data-route="login-email"]').click();
-    for (let turn = 0; turn < 30; turn += 1) {
-      await settle();
-      if (!document.querySelector('[data-route="login-email"]').disabled) break;
-    }
+    await openAdminSettingsTab(document, "email");
     const form = document.querySelector('[data-form="admin-email-settings"]');
     assert.ok(form);
-    assert.equal(form.elements.namedItem("username").value, "");
+    assert.equal(form.elements.namedItem("username").value, "service-account");
     form.elements.namedItem("password").value = "sensitive-test-secret";
     form.elements.namedItem("fromAddress").value = "auth@example.test";
     form.elements.namedItem("baseUrl").value = "https://example.test";
@@ -2844,7 +3066,7 @@ test("native Admin client-scope creation validates and normalizes the draft", as
     harness.restore();
   }
 });
-test("native Admin forbidden response returns to an authorized Admin route", async () => {
+test("native Administration Settings shows a forbidden localization load without exposing its form", async () => {
   const harness = await renderConsole("admin");
   let forbidden = true;
   harness.setResponse("/api/admin/settings/localization", "GET", () => {
@@ -2860,33 +3082,9 @@ test("native Admin forbidden response returns to an authorized Admin route", asy
   });
   try {
     const { calls, document } = harness;
-    document.querySelector('[data-route="localization"]').click();
-    await settle();
-    assert.match(
-      document.querySelector('[role="alert"]').textContent,
-      /admin/i,
-    );
-    const returnToAuthorizedRoute = document.querySelector(
-      '[data-action="admin-return-authorized"]',
-    );
-    assert.ok(returnToAuthorizedRoute);
-    returnToAuthorizedRoute.click();
-    for (let turn = 0; turn < 30; turn += 1) {
-      await settle();
-      if (
-        document
-          .querySelector('[data-route="dashboard"]')
-          ?.getAttribute("aria-current") === "page"
-      )
-        break;
-    }
-    assert.equal(
-      document
-        .querySelector('[data-route="dashboard"]')
-        .getAttribute("aria-current"),
-      "page",
-    );
-    assert.equal(document.querySelector('[role="alert"]'), null);
+    await openAdminSettingsTab(document, "localization");
+    assert.match(document.querySelector('[role="alert"]').textContent, /could not be loaded/i);
+    assert.equal(document.querySelector('[data-form="admin-localization-settings"]'), null);
     assert.equal(
       calls.filter(
         ({ path, method }) =>
@@ -4120,8 +4318,7 @@ test("native Admin policy and branding settings render and persist their forms",
   );
   try {
     const { calls, document } = harness;
-    document.querySelector('[data-route="policies"]').click();
-    await settle();
+    await openAdminSettingsTab(document, "ciba-policy");
     const ciba = document.querySelector('[data-form="admin-ciba-policy"]');
     assert.ok(ciba);
     ciba.elements.namedItem("stepUpRequired").checked = true;
@@ -4140,6 +4337,8 @@ test("native Admin policy and branding settings render and persist their forms",
           body.stepUpRequired,
       ),
     );
+    document.querySelector('[data-action="admin-settings-tab"][data-tab="offline-access"]').click();
+    await settle();
     const offline = document.querySelector(
       '[data-form="admin-offline-access-policy"]',
     );
@@ -4160,7 +4359,7 @@ test("native Admin policy and branding settings render and persist their forms",
           body.maxLimited === false,
       ),
     );
-    document.querySelector('[data-route="configuration"]').click();
+    document.querySelector('[data-action="admin-settings-tab"][data-tab="branding"]').click();
     await settle();
     const branding = document.querySelector('[data-form="admin-branding"]');
     assert.ok(branding);
@@ -4255,8 +4454,7 @@ test("native Admin LDAP overview displays configured provider status", async () 
   ]);
   try {
     const { document } = harness;
-    document.querySelector('[data-route="ldap"]').click();
-    await settle();
+    await openAdminSettingsTab(document, "user-federation");
     assert.match(
       document.querySelector(".content").textContent,
       /Corporate Directory/,
@@ -5703,12 +5901,9 @@ test("native Admin message overrides edit, create, and delete localized messages
   });
   try {
     const { calls, document } = harness;
-    document.querySelector('[data-route="localization"]').click();
-    for (let turn = 0; turn < 30; turn += 1) {
-      await settle();
-      if (!document.querySelector('[data-route="localization"]').disabled)
-        break;
-    }
+    await openAdminSettingsTab(document, "localization");
+    document.querySelector('[data-action="admin-settings-localization-tab"][data-tab="overrides"]').click();
+    await settle();
     const edit = document.querySelector(
       '[data-form="admin-localization-message"]',
     );

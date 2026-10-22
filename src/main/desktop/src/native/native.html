@@ -1508,6 +1508,40 @@
         border-bottom-color: var(--primary);
         color: var(--primary);
       }
+      .admin-settings-tabs {
+        display: flex;
+        gap: 4px;
+        min-width: 0;
+        overflow-x: auto;
+        border-bottom: 1px solid var(--border);
+        scrollbar-width: thin;
+      }
+      .admin-settings-tabs [role="tab"] {
+        min-height: 44px;
+        flex: 0 0 auto;
+        padding: 10px 12px;
+        border: 0;
+        border-bottom: 3px solid transparent;
+        background: transparent;
+        color: var(--text-muted);
+        cursor: pointer;
+        font: inherit;
+      }
+      .admin-settings-tabs [role="tab"]:hover,
+      .admin-settings-tabs [role="tab"].active {
+        border-bottom-color: var(--primary);
+        color: var(--primary);
+      }
+      .admin-settings-tabs [role="tab"]:focus-visible,
+      .admin-settings-subtabs [role="tab"]:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: -2px;
+      }
+      .admin-settings-panel {
+        display: grid;
+        gap: var(--space-medium);
+        min-width: 0;
+      }
       .admin-authentication {
         display: grid;
         gap: 18px;
@@ -2463,6 +2497,59 @@
         border-bottom: 1px solid
           color-mix(in srgb, var(--border) 75%, transparent);
         font-size: 13px;
+      }
+      .native-settings-switch {
+        flex-wrap: nowrap;
+        cursor: pointer;
+      }
+      .native-settings-switch-label {
+        min-width: 0;
+      }
+      .native-settings-switch input[type="checkbox"] {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+      .native-settings-switch-control {
+        position: relative;
+        display: inline-block;
+        width: 32px;
+        height: 18px;
+        flex: 0 0 32px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface-muted);
+        transition: background-color 160ms ease, border-color 160ms ease;
+      }
+      .native-settings-switch-control::before {
+        position: absolute;
+        top: 1px;
+        left: 1px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        content: "";
+        transition: transform 160ms ease, background-color 160ms ease;
+      }
+      .native-settings-switch input[type="checkbox"]:checked + .native-settings-switch-control {
+        border-color: var(--primary);
+        background: var(--primary);
+      }
+      .native-settings-switch input[type="checkbox"]:checked + .native-settings-switch-control::before {
+        transform: translateX(14px);
+        background: var(--on-primary);
+      }
+      .native-settings-switch input[type="checkbox"]:focus-visible + .native-settings-switch-control {
+        outline: 3px solid color-mix(in srgb, var(--focus) 35%, transparent);
+        outline-offset: 2px;
+      }
+      .native-settings-switch input[type="checkbox"]:disabled + .native-settings-switch-control {
+        cursor: not-allowed;
+        opacity: 0.55;
       }
       .admin-user-detail-switch {
         min-height: 52px;
