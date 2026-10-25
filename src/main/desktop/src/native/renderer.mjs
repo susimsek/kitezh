@@ -88,11 +88,6 @@ function adminUserById(id) {
 const spin = (busy) =>
   busy ? '<span class="spinner" aria-hidden="true"></span>' : "";
 const actionIcons = {
-  "admin-provider-mappers-toggle": "edit",
-  "admin-identity-provider-config-edit": "edit",
-  "admin-saml-provider-config-edit": "edit",
-  "admin-oidc-provider-create": "add",
-  "admin-saml-provider-create": "add",
   "admin-message-delete-request": "delete",
   "admin-message-delete-confirm": "delete",
   "admin-provider-mapper-create": "add",
@@ -126,14 +121,11 @@ const actionIcons = {
   "admin-client-scope-mapper-delete-confirm": "delete",
   "admin-client-delete-request": "delete",
   "admin-client-delete-confirm": "delete",
-  "admin-client-scope-assignments-toggle": "edit",
   "admin-client-scope-assignments-save": "check",
-  "admin-client-mappers-toggle": "edit",
   "admin-client-mapper-create": "add",
   "admin-client-mapper-edit": "edit",
   "admin-client-mapper-delete-request": "delete",
   "admin-client-mapper-delete-confirm": "delete",
-  "admin-client-roles-toggle": "edit",
   "admin-client-role-assignments-toggle": "edit",
   "admin-client-role-assignment-add": "add",
   "admin-client-role-assignment-remove-request": "delete",
@@ -425,6 +417,11 @@ const pageHeader = (title, description) => {
   return `<div class="topbar ${["clients", "client-detail", "client-create"].includes(state.route) ? "is-client-screen" : ""}"><div><h1 tabindex="-1" class="${state.route === "role-detail" ? "role-name" : ""}">${escapeHtml(title)}${eventCount}</h1>${state.route === "client-detail" ? `<code class="muted client-heading-id">${escapeHtml(state.data.clientConfiguration?.clientId ?? "")}</code>` : `<p>${escapeHtml(description)}</p>`}</div><div class="actions">${createAction}${deleteScopeAction}${sessionAction}${keyAction}</div></div>`;
 };
 
+function identityProviderItems() {
+  const content = state.data.identityProviders?.content;
+  return Array.isArray(content) ? content : [];
+}
+
 function identityProviderBreadcrumb() {
   if (
     !["identity-provider-create", "identity-provider-detail"].includes(
@@ -432,7 +429,7 @@ function identityProviderBreadcrumb() {
     )
   )
     return "";
-  const provider = (state.data.identityProviders?.content ?? []).find(
+  const provider = identityProviderItems().find(
     (item) => String(item.id) === String(state.data.identityProviderDetailId),
   );
   const current =
@@ -855,7 +852,7 @@ function routeTitle() {
       "identity-providers": text("adminIdentityProviders"),
       "identity-provider-create": text("adminCreateProvider"),
       "identity-provider-detail":
-        (state.data.identityProviders?.content ?? []).find(
+        identityProviderItems().find(
           (item) =>
             String(item.id) === String(state.data.identityProviderDetailId),
         )?.displayName ?? text("adminIdentityProviders"),
@@ -2012,8 +2009,6 @@ const organizationScreens = createOrganizationScreens({
 });
 const adminRolesContent = () => roleScreens.list();
 const adminRoleCreateContent = () => roleScreens.create();
-const adminRoleCompositionPanel = (name, composition) =>
-  roleScreens.compositionPanel(name, composition);
 
 function clientScopeRoleOptions(scopeId, kind) {
   const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
@@ -3775,175 +3770,6 @@ function bindNativeClients() {
     );
 }
 
-function renderIdentityProviderMappers(providerId) {
-  if (state.data.identityProviderMappersOpenId !== providerId) return "";
-  const mappers = state.data.identityProviderMappers?.[providerId] ?? [];
-  if (!Array.isArray(mappers)) return "";
-  const editor = state.data.providerMapperEditor;
-  const mapperId = editor?.providerId === providerId ? editor.mapperId : null;
-  const selectedMapper =
-    mapperId === null ? null : mappers.find((mapper) => mapper.id === mapperId);
-  const draftKey = mapperId ?? "new";
-  const draft = state.data.providerMapperDrafts?.[providerId]?.[draftKey] ?? {};
-  const errorKey = `${providerId}:${draftKey}`;
-  const errors =
-    state.data.providerMapperErrorKey === errorKey
-      ? violations(state.error?.body)
-      : {};
-  const formBusy = state.busy === `provider-mapper-save:${errorKey}`;
-  const mapperEditor =
-    editor?.providerId === providerId
-      ? `<form class="card" data-form="admin-provider-mapper" data-provider-id="${escapeHtml(providerId)}" data-mapper-id="${escapeHtml(mapperId ?? "")}" novalidate><h3>${escapeHtml(
-          text(
-            chooseLazy(
-              mapperId,
-              () => "adminEditProviderMapper",
-              () => "adminCreateProviderMapper",
-            ),
-          ),
-        )}</h3>${field("name", text("adminProviderMapperName"), draft.name ?? selectedMapper?.name ?? "", errors.name, "text", 'maxlength="100" required')}${field("sourceClaim", text("adminProviderMapperSource"), draft.sourceClaim ?? selectedMapper?.sourceClaim ?? "", errors.sourceClaim, "text", 'maxlength="200" required')}${field("target", text("adminProviderMapperTarget"), draft.target ?? selectedMapper?.target ?? "", errors.target, "text", 'maxlength="200" required')}<div class="field"><label for="provider-mapper-type">${escapeHtml(text("adminProviderMapperType"))}</label><select id="provider-mapper-type" name="mapperType"><option value="user-attribute" ${chooseLazy(
-          (draft.mapperType ??
-            selectedMapper?.mapperType ??
-            "user-attribute") === "user-attribute",
-          () => "selected",
-          () => "",
-        )}>user-attribute</option><option value="claim" ${chooseLazy(
-          (draft.mapperType ?? selectedMapper?.mapperType) === "claim",
-          () => "selected",
-          () => "",
-        )}>claim</option><option value="role" ${chooseLazy(
-          (draft.mapperType ?? selectedMapper?.mapperType) === "role",
-          () => "selected",
-          () => "",
-        )}>role</option><option value="group" ${chooseLazy(
-          (draft.mapperType ?? selectedMapper?.mapperType) === "group",
-          () => "selected",
-          () => "",
-        )}>group</option></select><div class="field-error">${escapeHtml(errors.mapperType ?? "")}</div></div><div class="field"><label for="provider-mapper-sync-mode">${escapeHtml(text("adminProviderMapperSyncMode"))}</label><select id="provider-mapper-sync-mode" name="syncMode"><option value="inherit" ${chooseLazy(
-          (draft.syncMode ?? selectedMapper?.syncMode ?? "inherit") ===
-            "inherit",
-          () => "selected",
-          () => "",
-        )}>inherit</option><option value="legacy" ${chooseLazy(
-          (draft.syncMode ?? selectedMapper?.syncMode) === "legacy",
-          () => "selected",
-          () => "",
-        )}>legacy</option><option value="import" ${chooseLazy(
-          (draft.syncMode ?? selectedMapper?.syncMode) === "import",
-          () => "selected",
-          () => "",
-        )}>import</option><option value="read_only" ${chooseLazy(
-          (draft.syncMode ?? selectedMapper?.syncMode) === "read_only",
-          () => "selected",
-          () => "",
-        )}>read_only</option><option value="force" ${chooseLazy(
-          (draft.syncMode ?? selectedMapper?.syncMode) === "force",
-          () => "selected",
-          () => "",
-        )}>force</option></select><div class="field-error">${escapeHtml(errors.syncMode ?? "")}</div></div><label class="settings-row"><input type="checkbox" name="addToIdToken" ${chooseLazy(
-          draft.addToIdToken ?? selectedMapper?.addToIdToken,
-          () => "checked",
-          () => "",
-        )}/>${escapeHtml(text("adminMapperAddToIdToken"))}</label><label class="settings-row"><input type="checkbox" name="addToAccessToken" ${chooseLazy(
-          draft.addToAccessToken ?? selectedMapper?.addToAccessToken,
-          () => "checked",
-          () => "",
-        )}/>${escapeHtml(text("adminMapperAddToAccessToken"))}</label><div class="actions">${button(text("save"), { type: "submit", busy: formBusy, disabled: state.offline || Boolean(state.busy) })}<button class="secondary-button" type="button" data-action="admin-provider-mapper-editor-cancel" data-provider="${escapeHtml(providerId)}" ${chooseLazy(
-          state.busy,
-          () => "disabled",
-          () => "",
-        )}>${escapeHtml(text("cancel"))}</button></div></form>`
-      : "";
-  const addMapperButton = button(text("adminAddProviderMapper"), {
-    action: "admin-provider-mapper-create",
-    provider: providerId,
-    disabled: state.offline || Boolean(state.busy),
-  });
-  return `<section class="card" aria-label="${escapeHtml(text("adminProviderMappers"))}"><div class="list">${
-    mappers.length
-      ? mappers
-          .map((mapper) => {
-            const confirmation = state.data.providerMapperDeleteConfirm;
-            const confirming =
-              confirmation?.providerId === providerId &&
-              confirmation?.mapperId === mapper.id;
-            const busy =
-              state.busy ===
-              "provider-mapper-delete:" + providerId + ":" + mapper.id + "";
-            const controls = chooseLazy(
-              confirming,
-              () =>
-                '<div class="actions"><span role="status">' +
-                escapeHtml(text("adminDeleteProviderMapperPrompt")) +
-                "</span>" +
-                button(text("adminDeleteProviderMapper"), {
-                  action: "admin-provider-mapper-delete-confirm",
-                  provider: providerId,
-                  id: mapper.id,
-                  danger: true,
-                  busy,
-                  disabled: state.offline || Boolean(state.busy),
-                }) +
-                '<button class="secondary-button" type="button" data-action="admin-provider-mapper-delete-cancel" data-provider="' +
-                escapeHtml(providerId) +
-                '" data-id="' +
-                escapeHtml(mapper.id) +
-                '" ' +
-                chooseLazy(
-                  state.busy,
-                  () => "disabled",
-                  () => "",
-                ) +
-                ">" +
-                escapeHtml(text("cancel")) +
-                "</button></div>",
-              () =>
-                '<div class="actions">' +
-                button(text("adminEditProviderMapper"), {
-                  action: "admin-provider-mapper-edit",
-                  provider: providerId,
-                  id: mapper.id,
-                  disabled: state.offline || Boolean(state.busy),
-                }) +
-                "" +
-                button(text("adminDeleteProviderMapper"), {
-                  action: "admin-provider-mapper-delete-request",
-                  provider: providerId,
-                  id: mapper.id,
-                  danger: true,
-                  disabled: state.offline || Boolean(state.busy),
-                }) +
-                "</div>",
-            );
-            return (
-              '<article class="list-item" data-provider-mapper-id="' +
-              escapeHtml(mapper.id) +
-              '"><div><strong>' +
-              escapeHtml(mapper.name) +
-              '</strong><span class="muted">' +
-              escapeHtml(
-                "" +
-                  mapper.sourceClaim +
-                  " → " +
-                  mapper.target +
-                  " · " +
-                  mapper.mapperType +
-                  "",
-              ) +
-              "</span></div><span>" +
-              escapeHtml(mapper.syncMode) +
-              "</span>" +
-              controls +
-              "</article>"
-            );
-          })
-          .join("")
-      : '<div class="empty" role="status">' +
-        escapeHtml(text("adminNoProviderMappers")) +
-        "</div>"
-  }</div><div class="actions">${addMapperButton}</div>${mapperEditor}</section>`;
-}
-
 function adminIdentityProvidersContent() {
   const page = state.data.identityProviders ?? {
     content: [],
@@ -4005,7 +3831,7 @@ function identityProviderDetailContent(id, tab) {
   const creating = id === "new";
   const provider = creating
     ? null
-    : (state.data.identityProviders?.content ?? []).find(
+    : identityProviderItems().find(
         (item) => String(item.id) === String(id),
       );
   const providerId = creating ? "" : String(id ?? "");
@@ -4094,338 +3920,6 @@ function identityProviderPolicyForm(providerId) {
   const option = (name, value) =>
     (draft[name] ?? "") === value ? "selected" : "";
   return `<form class="card identity-provider-policy-form" data-form="admin-identity-provider-policy" data-provider-id="${escapeHtml(providerId)}"><h2>${escapeHtml(text("adminIdentityProviderOptions"))}</h2><div class="field"><label for="policy-display-name">${escapeHtml(text("adminProviderDisplayName"))}</label><input id="policy-display-name" name="displayName" value="${escapeHtml(draft.displayName ?? "")}" maxlength="100" required/><div class="field-error">${escapeHtml(errors.displayName ?? "")}</div></div><label class="settings-row"><span>${escapeHtml(text("adminProviderEnabled"))}</span><input name="enabled" type="checkbox" ${checked("enabled")}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderHideOnLogin"))}</span><input name="hideOnLogin" type="checkbox" ${checked("hideOnLogin")}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderLinkingOnly"))}</span><input name="accountLinkingOnly" type="checkbox" ${checked("accountLinkingOnly")}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderTrustEmail"))}</span><input name="trustEmail" type="checkbox" ${checked("trustEmail")}/></label><label class="settings-row"><span>${escapeHtml(text("adminProviderRequireMfa"))}</span><input name="mfaRequired" type="checkbox" ${checked("mfaRequired")}/></label><div class="field"><label for="policy-order">${escapeHtml(text("adminProviderOrder"))}</label><input id="policy-order" name="guiOrder" type="number" min="0" max="2147483647" value="${escapeHtml(draft.guiOrder ?? 0)}" required/><div class="field-error">${escapeHtml(errors.guiOrder ?? "")}</div></div><div class="field"><label for="policy-visibility">${escapeHtml(text("adminProviderAccountVisibility"))}</label><select id="policy-visibility" name="showInAccountConsole"><option value="always" ${option("showInAccountConsole", "always")}>${escapeHtml(text("adminProviderAlways"))}</option><option value="when-linked" ${option("showInAccountConsole", "when-linked")}>${escapeHtml(text("adminProviderWhenLinked"))}</option><option value="never" ${option("showInAccountConsole", "never")}>${escapeHtml(text("adminProviderNever"))}</option></select><div class="field-error">${escapeHtml(errors.showInAccountConsole ?? "")}</div></div><div class="field"><label for="policy-sync">${escapeHtml(text("adminProviderSyncMode"))}</label><select id="policy-sync" name="syncMode"><option value="legacy" ${option("syncMode", "legacy")}>legacy</option><option value="import" ${option("syncMode", "import")}>import</option><option value="read_only" ${option("syncMode", "read_only")}>read_only</option><option value="force" ${option("syncMode", "force")}>force</option></select><div class="field-error">${escapeHtml(errors.syncMode ?? "")}</div></div><div class="actions">${button(text("save"), { type: "submit", busy: state.busy === `identity-provider-policy-save:${providerId}`, disabled: state.offline || Boolean(state.busy) })}</div></form>`;
-}
-
-function legacyAdminIdentityProvidersContent() {
-  const page = state.data.identityProviders ?? {
-    content: [],
-    number: 0,
-    totalPages: 0,
-  };
-  const providers = Array.isArray(page.content) ? page.content : [];
-  const currentPage = Number.isSafeInteger(page.number) ? page.number : 0;
-  const totalPages = Number.isSafeInteger(page.totalPages)
-    ? page.totalPages
-    : 0;
-  const openConfigurationId = state.data.identityProviderConfigurationOpenId;
-  const createForm =
-    openConfigurationId === "new"
-      ? identityProviderConfigurationForm("new")
-      : chooseLazy(
-          openConfigurationId === "new-saml",
-          () => samlIdentityProviderConfigurationForm("new-saml"),
-          () => "",
-        );
-  return `<section class="card" aria-label="${escapeHtml(text("adminIdentityProviders"))}"><div class="admin-detail-heading"><h2>${escapeHtml(text("adminIdentityProviders"))}</h2><div class="actions">${button(text("adminAddOidcProvider"), { action: "admin-oidc-provider-create", icon: "add", busy: state.busy === "identity-provider-create", disabled: state.offline || Boolean(state.busy) })}${button(text("adminAddSamlProvider"), { action: "admin-saml-provider-create", icon: "add", disabled: state.offline || Boolean(state.busy) })}</div></div>${createForm}<form id="admin-identity-provider-search" class="actions" role="search"><input id="admin-identity-provider-query" name="q" type="search" aria-label="${escapeHtml(text("adminSearchIdentityProviders"))}" value="${escapeHtml(state.data.identityProviderQuery ?? "")}" placeholder="${escapeHtml(text("adminSearchIdentityProviders"))}" maxlength="200"/><button class="primary-button" type="submit" ${state.busy === "identity-providers-search" ? 'disabled aria-busy="true"' : ""}>${spin(state.busy === "identity-providers-search")}${escapeHtml(text("adminSearchIdentityProviders"))}</button></form>${
-    providers.length
-      ? '<div class="list">' +
-        providers
-          .map((provider) => {
-            const id = String(provider.id ?? "");
-            const policy = state.data.identityProviderPolicies?.[id];
-            const editingPolicy =
-              state.data.identityProviderPolicyOpenId === id;
-            const policyDraft =
-              state.data.identityProviderPolicyDrafts?.[id] ?? policy ?? {};
-            const policyErrors = chooseLazy(
-              state.data.identityProviderPolicyErrorId === id,
-              () => violations(state.error?.body),
-              () => ({}),
-            );
-            const confirming =
-              state.data.identityProviderDeleteConfirmId === id;
-            const editingConnection =
-              state.data.identityProviderConfigurationOpenId === id;
-            const connectionForm = chooseLazy(
-              editingConnection,
-              () =>
-                chooseLazy(
-                  provider.providerType === "saml",
-                  () => samlIdentityProviderConfigurationForm(id),
-                  () => identityProviderConfigurationForm(id),
-                ),
-              () => "",
-            );
-            const controls = chooseLazy(
-              confirming,
-              () =>
-                '<div class="actions"><span role="status">' +
-                escapeHtml(text("adminDeleteIdentityProviderPrompt")) +
-                "</span>" +
-                button(text("adminDeleteIdentityProvider"), {
-                  action: "admin-identity-provider-delete-confirm",
-                  id,
-                  danger: true,
-                  busy: state.busy === "identity-provider-delete:" + id + "",
-                  disabled: state.offline || Boolean(state.busy),
-                }) +
-                '<button class="secondary-button" type="button" data-action="admin-identity-provider-delete-cancel" data-id="' +
-                escapeHtml(id) +
-                '" ' +
-                chooseLazy(
-                  state.busy,
-                  () => "disabled",
-                  () => "",
-                ) +
-                ">" +
-                escapeHtml(text("cancel")) +
-                "</button></div>",
-              () =>
-                '<div class="actions">' +
-                button(text("adminDeleteIdentityProvider"), {
-                  action: "admin-identity-provider-delete-request",
-                  id,
-                  danger: true,
-                  disabled: state.offline || Boolean(state.busy),
-                }) +
-                "</div>",
-            );
-            const policyForm = chooseLazy(
-              editingPolicy && policy,
-              () =>
-                '<form class="card" data-form="admin-identity-provider-policy" data-provider-id="' +
-                escapeHtml(id) +
-                '"><div class="field"><label for="provider-policy-name-' +
-                escapeHtml(id) +
-                '">' +
-                escapeHtml(text("adminProviderDisplayName")) +
-                '</label><input id="provider-policy-name-' +
-                escapeHtml(id) +
-                '" name="displayName" type="text" value="' +
-                escapeHtml(policyDraft.displayName ?? policy.displayName) +
-                '" maxlength="100" required/><div class="field-error">' +
-                escapeHtml(policyErrors.displayName ?? "") +
-                '</div></div><label class="settings-row"><span>' +
-                escapeHtml(text("adminProviderEnabled")) +
-                '</span><input name="enabled" type="checkbox" ' +
-                chooseLazy(
-                  policyDraft.enabled ?? policy.enabled,
-                  () => "checked",
-                  () => "",
-                ) +
-                '/></label><label class="settings-row"><span>' +
-                escapeHtml(text("adminProviderHideOnLogin")) +
-                '</span><input name="hideOnLogin" type="checkbox" ' +
-                chooseLazy(
-                  policyDraft.hideOnLogin ?? policy.hideOnLogin,
-                  () => "checked",
-                  () => "",
-                ) +
-                '/></label><label class="settings-row"><span>' +
-                escapeHtml(text("adminProviderLinkingOnly")) +
-                '</span><input name="accountLinkingOnly" type="checkbox" ' +
-                chooseLazy(
-                  policyDraft.accountLinkingOnly ?? policy.accountLinkingOnly,
-                  () => "checked",
-                  () => "",
-                ) +
-                '/></label><label class="settings-row"><span>' +
-                escapeHtml(text("adminProviderTrustEmail")) +
-                '</span><input name="trustEmail" type="checkbox" ' +
-                chooseLazy(
-                  policyDraft.trustEmail ?? policy.trustEmail,
-                  () => "checked",
-                  () => "",
-                ) +
-                '/></label><label class="settings-row"><span>' +
-                escapeHtml(text("adminProviderRequireMfa")) +
-                '</span><input name="mfaRequired" type="checkbox" ' +
-                chooseLazy(
-                  policyDraft.mfaRequired ?? policy.mfaRequired,
-                  () => "checked",
-                  () => "",
-                ) +
-                '/></label><div class="field"><label for="provider-policy-order-' +
-                escapeHtml(id) +
-                '">' +
-                escapeHtml(text("adminProviderOrder")) +
-                '</label><input id="provider-policy-order-' +
-                escapeHtml(id) +
-                '" name="guiOrder" type="number" min="0" max="2147483647" value="' +
-                escapeHtml(policyDraft.guiOrder ?? policy.guiOrder) +
-                '" required/><div class="field-error">' +
-                escapeHtml(policyErrors.guiOrder ?? "") +
-                '</div></div><div class="field"><label for="provider-policy-visibility-' +
-                escapeHtml(id) +
-                '">' +
-                escapeHtml(text("adminProviderAccountVisibility")) +
-                '</label><select id="provider-policy-visibility-' +
-                escapeHtml(id) +
-                '" name="showInAccountConsole"><option value="always" ' +
-                chooseLazy(
-                  (policyDraft.showInAccountConsole ??
-                    policy.showInAccountConsole) === "always",
-                  () => "selected",
-                  () => "",
-                ) +
-                ">" +
-                escapeHtml(text("adminProviderAlways")) +
-                '</option><option value="when-linked" ' +
-                chooseLazy(
-                  (policyDraft.showInAccountConsole ??
-                    policy.showInAccountConsole) === "when-linked",
-                  () => "selected",
-                  () => "",
-                ) +
-                ">" +
-                escapeHtml(text("adminProviderWhenLinked")) +
-                '</option><option value="never" ' +
-                chooseLazy(
-                  (policyDraft.showInAccountConsole ??
-                    policy.showInAccountConsole) === "never",
-                  () => "selected",
-                  () => "",
-                ) +
-                ">" +
-                escapeHtml(text("adminProviderNever")) +
-                '</option></select><div class="field-error">' +
-                escapeHtml(policyErrors.showInAccountConsole ?? "") +
-                '</div></div><div class="field"><label for="provider-policy-sync-' +
-                escapeHtml(id) +
-                '">' +
-                escapeHtml(text("adminProviderSyncMode")) +
-                '</label><select id="provider-policy-sync-' +
-                escapeHtml(id) +
-                '" name="syncMode"><option value="legacy" ' +
-                chooseLazy(
-                  (policyDraft.syncMode ?? policy.syncMode) === "legacy",
-                  () => "selected",
-                  () => "",
-                ) +
-                '>legacy</option><option value="import" ' +
-                chooseLazy(
-                  (policyDraft.syncMode ?? policy.syncMode) === "import",
-                  () => "selected",
-                  () => "",
-                ) +
-                '>import</option><option value="read_only" ' +
-                chooseLazy(
-                  (policyDraft.syncMode ?? policy.syncMode) === "read_only",
-                  () => "selected",
-                  () => "",
-                ) +
-                '>read_only</option><option value="force" ' +
-                chooseLazy(
-                  (policyDraft.syncMode ?? policy.syncMode) === "force",
-                  () => "selected",
-                  () => "",
-                ) +
-                '>force</option></select><div class="field-error">' +
-                escapeHtml(policyErrors.syncMode ?? "") +
-                '</div></div><div class="actions">' +
-                button(text("save"), {
-                  type: "submit",
-                  busy:
-                    state.busy === "identity-provider-policy-save:" + id + "",
-                  disabled: state.offline || Boolean(state.busy),
-                }) +
-                '<button class="secondary-button" type="button" data-action="admin-identity-provider-policy-cancel" data-id="' +
-                escapeHtml(id) +
-                '" ' +
-                chooseLazy(
-                  state.busy,
-                  () => "disabled",
-                  () => "",
-                ) +
-                ">" +
-                escapeHtml(text("cancel")) +
-                "</button></div></form>",
-              () => "",
-            );
-            const mapperBusy = state.busy === "provider-mappers:" + id + "";
-            const mapperButton = button(text("adminManageProviderMappers"), {
-              action: "admin-provider-mappers-toggle",
-              id,
-              busy: mapperBusy,
-              disabled: state.offline || Boolean(state.busy),
-            });
-            const mapperPanel = renderIdentityProviderMappers(id);
-            const connectionButton = chooseLazy(
-              !["oidc", "saml"].includes(provider.providerType),
-              () => "",
-              () =>
-                button(
-                  text(
-                    chooseLazy(
-                      provider.providerType === "saml",
-                      () => "adminEditSamlConfiguration",
-                      () => "adminEditProviderConnection",
-                    ),
-                  ),
-                  {
-                    action: chooseLazy(
-                      provider.providerType === "saml",
-                      () => "admin-saml-provider-config-edit",
-                      () => "admin-identity-provider-config-edit",
-                    ),
-                    id,
-                    busy:
-                      state.busy === "identity-provider-config-load:" + id + "",
-                    disabled: state.offline || Boolean(state.busy),
-                  },
-                ),
-            );
-            return (
-              '<article class="list-item" data-identity-provider-id="' +
-              escapeHtml(id) +
-              '"><div><strong>' +
-              escapeHtml(provider.displayName || provider.alias) +
-              '</strong><span class="muted">' +
-              escapeHtml(
-                "" + provider.providerType + " · " + provider.alias + "",
-              ) +
-              '</span><span class="muted">' +
-              escapeHtml(
-                "" +
-                  provider.mapperCount +
-                  " " +
-                  text("adminProviderMappers") +
-                  "",
-              ) +
-              "</span></div><span>" +
-              escapeHtml(
-                chooseLazy(
-                  provider.enabled,
-                  () => text("adminProviderEnabled"),
-                  () => text("adminProviderDisabled"),
-                ),
-              ) +
-              " · " +
-              escapeHtml(
-                chooseLazy(
-                  provider.configured,
-                  () => text("adminConfigured"),
-                  () => text("adminUnconfigured"),
-                ),
-              ) +
-              '</span><div class="actions">' +
-              button(text("adminEditProviderPolicy"), {
-                action: "admin-identity-provider-policy-toggle",
-                id,
-                busy: state.busy === "identity-provider-policy-load:" + id + "",
-                disabled: state.offline || Boolean(state.busy),
-              }) +
-              "" +
-              connectionButton +
-              "" +
-              mapperButton +
-              "" +
-              controls +
-              "</div>" +
-              connectionForm +
-              "" +
-              policyForm +
-              "" +
-              mapperPanel +
-              "</article>"
-            );
-          })
-          .join("") +
-        "</div>"
-      : '<div class="empty" role="status">' +
-        escapeHtml(text("adminNoIdentityProviders")) +
-        "</div>"
-  }<div class="actions" aria-label="${escapeHtml(text("adminIdentityProviders"))} pagination"><button class="secondary-button" type="button" data-identity-provider-page="${currentPage - 1}" ${currentPage <= 0 || state.busy ? "disabled" : ""}>${spin(state.busy === "identity-providers-page-prev")}${escapeHtml(text("adminPrevious"))}</button><span>${escapeHtml(text("adminPage"))} ${totalPages === 0 ? 0 : currentPage + 1} / ${totalPages}</span><button class="secondary-button" type="button" data-identity-provider-page="${currentPage + 1}" ${currentPage + 1 >= totalPages || state.busy ? "disabled" : ""}>${spin(state.busy === "identity-providers-page-next")}${escapeHtml(text("adminNext"))}</button></div></section>`;
 }
 
 const PROVIDER_CONNECTION_FIELDS = [
@@ -5860,6 +5354,8 @@ function profileContent() {
 function securityContent() {
   const mfa = state.data.mfa ?? {};
   const social = state.data.social ?? [];
+  const personalAccessTokens = state.data.personalAccessTokens ?? [];
+  const createdPersonalAccessToken = state.data.createdPersonalAccessToken;
   const passwordErrors = violations(state.error?.body);
   return `<div class="grid two-col"><section class="card"><h2>${escapeHtml(text("passwordPolicy"))}</h2><p>${escapeHtml(text("securityTitle"))}</p><form data-form="password" novalidate>${field("currentPassword", text("currentPassword"), "", passwordErrors.currentPassword, "password")}${field("newPassword", text("newPassword"), "", passwordErrors.newPassword, "password")}${field("confirmPassword", text("confirmPassword"), "", passwordErrors.confirmPassword, "password")}<div class="actions">${button(text("save"), { action: "save-password", type: "submit", busy: state.busy === "password", mutation: true })}</div></form></section><section class="card"><h2>${escapeHtml(text("mfaTitle"))}</h2><p>${escapeHtml(text("mfaHelp"))}</p>${
     mfa.available === false
@@ -5960,7 +5456,7 @@ function securityContent() {
           )
           .join("")
       : '<div class="empty">' + escapeHtml(text("socialLinksEmpty")) + "</div>"
-  }</div></section><section class="card"><h2>${escapeHtml(text("deleteAccount"))}</h2><p>${escapeHtml(text("deleteAccountWarning"))}</p><form data-form="delete" novalidate>${field("deletePassword", text("currentPassword"), "", "", "password")}<div class="actions">${button(text("deleteAccount"), { action: "delete-account", danger: true, type: "submit", busy: state.busy === "delete", mutation: true })}</div></form></section></div>`;
+  }</div></section><section class="card"><h2>${escapeHtml(text("personalAccessTokensTitle"))}</h2><p>${escapeHtml(text("personalAccessTokensHelp"))}</p>${createdPersonalAccessToken ? `<div class="notice warning" role="status"><strong>${escapeHtml(text("personalAccessTokenCreated"))}</strong><p>${escapeHtml(text("personalAccessTokenOneTimeWarning"))}</p><label class="field"><span>${escapeHtml(text("personalAccessTokenValue"))}</span><input id="personal-access-token-value" type="${state.data.personalAccessTokenVisible ? "text" : "password"}" readonly value="${escapeHtml(createdPersonalAccessToken.token)}" autocomplete="off" spellcheck="false"/></label><div class="actions">${button(text("personalAccessTokenCopy"), { action: "personal-access-token-copy", variant: "secondary", busy: state.busy === "personal-access-token-copy" })}${button(text(state.data.personalAccessTokenVisible ? "personalAccessTokenHide" : "personalAccessTokenShow"), { action: "personal-access-token-toggle" })}${button(text("personalAccessTokenDismiss"), { action: "personal-access-token-dismiss", variant: "secondary" })}</div></div>` : ""}<form data-form="personal-access-token" novalidate><div class="form-grid">${field("name", text("personalAccessTokenName"), "", "", "text", 'maxlength="100" required autocomplete="off"')}${field("description", text("personalAccessTokenDescription"), "", "", "text", 'maxlength="500" autocomplete="off"')}<div class="field"><label for="personalAccessTokenExpiration">${escapeHtml(text("personalAccessTokenExpiration"))}</label><select id="personalAccessTokenExpiration" name="expiration"><option value="7">${escapeHtml(text("personalAccessTokenDays7"))}</option><option value="30" selected>${escapeHtml(text("personalAccessTokenDays30"))}</option><option value="60">${escapeHtml(text("personalAccessTokenDays60"))}</option><option value="90">${escapeHtml(text("personalAccessTokenDays90"))}</option><option value="custom">${escapeHtml(text("personalAccessTokenCustom"))}</option><option value="never">${escapeHtml(text("personalAccessTokenNever"))}</option></select></div><div class="field" data-pat-custom-date hidden><label for="customExpirationDate">${escapeHtml(text("personalAccessTokenCustomDate"))}</label><input id="customExpirationDate" name="customExpirationDate" type="date" autocomplete="off"/><div class="field-error"></div></div></div><p class="muted">${escapeHtml(text("personalAccessTokenScopeHelp"))}</p><div class="actions">${button(text("personalAccessTokenCreate"), { type: "submit", busy: state.busy === "personal-access-token-create", mutation: true })}</div></form><div class="list">${personalAccessTokens.length ? personalAccessTokens.map((token) => `<div class="list-item" data-id="${escapeHtml(token.id)}"><div><strong>${escapeHtml(token.name)}</strong><span class="muted">${escapeHtml(token.description ?? "")}${token.description ? " · " : ""}${escapeHtml(token.createdAt ?? "")} · ${escapeHtml(token.expiresAt ? new Date(token.expiresAt).toLocaleDateString(state.locale === "tr" ? "tr-TR" : "en-US") : text("personalAccessTokenNever"))} · ${escapeHtml(token.scope ?? "mcp.read")}</span></div>${button(text("personalAccessTokenRevoke"), { action: "personal-access-token-revoke", danger: true, busy: state.busy === "personal-access-token-revoke", mutation: true })}</div>`).join("") : '<div class="empty">' + escapeHtml(text("personalAccessTokensEmpty")) + "</div>"}</div></section><section class="card"><h2>${escapeHtml(text("deleteAccount"))}</h2><p>${escapeHtml(text("deleteAccountWarning"))}</p><form data-form="delete" novalidate>${field("deletePassword", text("currentPassword"), "", "", "password")}<div class="actions">${button(text("deleteAccount"), { action: "delete-account", danger: true, type: "submit", busy: state.busy === "delete", mutation: true })}</div></form></section></div>`;
 }
 
 function pageItems(items, emptyText, renderItem) {
@@ -6067,20 +5563,6 @@ function render({ preserveDrafts = true } = {}) {
       nextSearchInput.tagName === "TEXTAREA"
     )
       nextSearchInput.setSelectionRange(...searchSelection);
-  }
-}
-
-async function loadProfile() {
-  state.loading = true;
-  state.error = null;
-  render();
-  try {
-    state.profile = await request("/api/account/profile");
-    state.loading = false;
-    render();
-  } catch {
-    state.loading = false;
-    render();
   }
 }
 
@@ -6599,6 +6081,9 @@ async function loadRoute({ preserveError = false, keepContent = false } = {}) {
         "/api/account/mfa/recovery-codes",
       );
       state.data.social = await request("/api/account/social-links");
+      state.data.personalAccessTokens = await request(
+        "/api/account/personal-access-tokens",
+      );
     }
     state.error = null;
     state.loading = false;
@@ -7012,12 +6497,6 @@ function preserveOfflineDrafts() {
         form.dataset.form === "admin-saml-identity-provider-connection"
           ? samlIdentityProviderConfigurationFormDraft(form)
           : identityProviderConfigurationFormDraft(form);
-    } else if (form.dataset.form === "admin-client-native-metadata") {
-      const id = form.dataset.clientId;
-      if (/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "")) {
-        state.data.clientMetadataDrafts ??= {};
-        state.data.clientMetadataDrafts[id] = values;
-      }
     } else if (form.dataset.form === "admin-client-scope-assignments") {
       const id = form.dataset.clientId;
       if (/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "")) {
@@ -8437,53 +7916,6 @@ async function submitForm(form) {
     render({ preserveDrafts: false });
     return;
   }
-  if (form.dataset.form === "admin-client-native-metadata") {
-    const id = form.dataset.clientId ?? "";
-    const clients =
-      state.data.clientConfiguration && state.route === "client-detail"
-        ? [state.data.clientConfiguration]
-        : nativeClientRows();
-    if (
-      state.offline ||
-      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
-      !clients.some((client) => client.id === id) ||
-      !form.reportValidity()
-    )
-      return;
-    const body = {
-      clientName: String(formString(values.clientName, "")).trim(),
-    };
-    state.data.clientMetadataDrafts ??= {};
-    state.data.clientMetadataDrafts[id] = body;
-    state.data.clientMetadataErrorId = id;
-    state.error = null;
-    state.notice = null;
-    state.busy = `client-metadata-save:${id}`;
-    render();
-    try {
-      const saved = await request(
-        `/api/admin/clients/${encodeURIComponent(id)}/native-metadata`,
-        { method: "PUT", body },
-      );
-      state.data.clients = {
-        ...state.data.clients,
-        content: clients.map((client) =>
-          client.id === id
-            ? { ...client, clientName: saved.clientName }
-            : client,
-        ),
-      };
-      delete state.data.clientMetadataDrafts[id];
-      state.data.clientMetadataEditId = null;
-      state.data.clientMetadataErrorId = null;
-      state.notice = text("adminClientMetadataUpdated");
-    } catch {
-      /* request rendered localized server validation or transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
   if (form.dataset.form === "admin-client-scope-assignments") {
     const clientId = form.dataset.clientId ?? "";
     const clients =
@@ -9817,6 +9249,42 @@ async function submitForm(form) {
       state.notice = text("passwordSaved");
     } catch {
       /* request rendered the sanitized error */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (form.dataset.form === "personal-access-token") {
+    const expiration = form.elements.namedItem("expiration").value;
+    const customExpirationDate = form.elements.namedItem("customExpirationDate").value;
+    if (!String(values.name ?? "").trim() || (expiration === "custom" && !customExpirationDate)) {
+      form.reportValidity();
+      return;
+    }
+    state.busy = "personal-access-token-create";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      state.data.createdPersonalAccessToken = await request(
+        "/api/account/personal-access-tokens",
+        {
+          method: "POST",
+          body: {
+            name: String(values.name).trim(),
+            description: String(values.description ?? "").trim() || null,
+            expiration,
+            ...(expiration === "custom" ? { customExpirationDate } : {}),
+          },
+        },
+      );
+      state.data.personalAccessTokenVisible = false;
+      state.data.personalAccessTokens = await request(
+        "/api/account/personal-access-tokens",
+      );
+      state.notice = text("personalAccessTokenCreated");
+    } catch {
+      /* request rendered the localized API error. */
     }
     state.busy = null;
     render();
@@ -11457,32 +10925,6 @@ async function action(action, element) {
     render();
     return;
   }
-  if (action === "admin-client-roles-toggle") {
-    const clientId = element.dataset.id ?? "";
-    if (
-      state.busy ||
-      state.offline ||
-      state.data.adminAccess?.manageClients !== true ||
-      !/^[A-Za-z0-9_-]{1,100}$/.test(clientId) ||
-      !state.data.clients?.content?.some((client) => client.id === clientId) ||
-      clientId === "admin-console"
-    )
-      return;
-    state.data.clientRoles ??= {};
-    const panel = (state.data.clientRoles[clientId] ??= { open: false });
-    if (panel.open) {
-      panel.open = false;
-      render();
-      return;
-    }
-    await loadClientRoles(
-      clientId,
-      0,
-      panel.query ?? "",
-      `client-roles-load:${clientId}`,
-    );
-    return;
-  }
   if (
     action === "admin-client-role-edit" ||
     action === "admin-client-role-edit-cancel" ||
@@ -11873,43 +11315,6 @@ async function action(action, element) {
         : [];
       state.data.clientScopeMappersOpenId = scopeId;
     } catch {
-      /* request rendered localized authorization or transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
-  if (action === "admin-client-mappers-toggle") {
-    if (state.busy || state.offline) return;
-    const clientId = element.dataset.id;
-    const client = nativeClientRows().some(
-      (item) => String(item.id) === clientId,
-    );
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(clientId ?? "") || !client) return;
-    if (state.data.clientMappersOpenId === clientId) {
-      state.data.clientMappersOpenId = null;
-      render();
-      return;
-    }
-    state.data.clientMappersOpenId = clientId;
-    if (Array.isArray(state.data.clientMappers?.[clientId])) {
-      render();
-      return;
-    }
-    state.busy = `client-mappers-load:${clientId}`;
-    state.error = null;
-    state.notice = null;
-    render();
-    try {
-      const page = await request(
-        `/api/admin/clients/${encodeURIComponent(clientId)}/mappers?page=0&size=20&sort=name,asc`,
-      );
-      state.data.clientMappers ??= {};
-      state.data.clientMappers[clientId] = Array.isArray(page?.content)
-        ? page.content
-        : [];
-    } catch {
-      state.data.clientMappersOpenId = null;
       /* request rendered localized authorization or transport feedback */
     }
     state.busy = null;
@@ -13022,46 +12427,6 @@ async function action(action, element) {
     render();
     return;
   }
-  if (action === "admin-provider-mappers-toggle") {
-    if (state.busy || state.offline) return;
-    const id = element.dataset.id;
-    const providers = state.data.identityProviders?.content ?? [];
-    if (
-      typeof id !== "string" ||
-      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
-      !providers.some((provider) => provider.id === id)
-    )
-      return;
-    if (state.data.identityProviderMappersOpenId === id) {
-      state.data.identityProviderMappersOpenId = null;
-      render();
-      return;
-    }
-    const cached = state.data.identityProviderMappers?.[id];
-    if (Array.isArray(cached)) {
-      state.data.identityProviderMappersOpenId = id;
-      render();
-      return;
-    }
-    state.busy = `provider-mappers:${id}`;
-    state.error = null;
-    render();
-    try {
-      const page = await request(
-        `/api/admin/identity-providers/${id}/mappers?page=0&size=20&sort=name,asc`,
-      );
-      state.data.identityProviderMappers ??= {};
-      state.data.identityProviderMappers[id] = Array.isArray(page?.content)
-        ? page.content
-        : [];
-      state.data.identityProviderMappersOpenId = id;
-    } catch {
-      /* request rendered localized transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
   if (
     action === "admin-provider-mapper-delete-request" ||
     action === "admin-provider-mapper-delete-confirm"
@@ -13138,131 +12503,6 @@ async function action(action, element) {
     )
       return;
     state.data.providerMapperDeleteConfirm = null;
-    render();
-    return;
-  }
-  if (action === "admin-identity-provider-policy-toggle") {
-    if (state.busy || state.offline) return;
-    const id = element.dataset.id;
-    const provider = (state.data.identityProviders?.content ?? []).some(
-      (item) => item.id === id,
-    );
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !provider) return;
-    if (state.data.identityProviderPolicyOpenId === id) {
-      state.data.identityProviderPolicyOpenId = null;
-      delete state.data.identityProviderPolicyDrafts?.[id];
-      state.data.identityProviderPolicyErrorId = null;
-      render();
-      return;
-    }
-    state.busy = `identity-provider-policy-load:${id}`;
-    state.error = null;
-    render();
-    try {
-      const policy = await request(
-        `/api/admin/identity-providers/${id}/native-policy`,
-      );
-      state.data.identityProviderPolicies ??= {};
-      state.data.identityProviderPolicies[id] = policy;
-      state.data.identityProviderPolicyOpenId = id;
-      state.data.identityProviderPolicyDrafts ??= {};
-      state.data.identityProviderPolicyDrafts[id] = policy;
-      state.data.identityProviderPolicyErrorId = null;
-    } catch {
-      /* request rendered localized transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
-  if (action === "admin-oidc-provider-create") {
-    if (state.busy || state.offline || !adminRouteAllowed("identity-providers"))
-      return;
-    state.data.identityProviderConfigurationOpenId = "new";
-    state.data.identityProviderConfigurationBaselines ??= {};
-    state.data.identityProviderConfigurationDrafts ??= {};
-    state.data.identityProviderConfigurationBaselines.new =
-      defaultIdentityProviderConfiguration();
-    state.data.identityProviderConfigurationDrafts.new =
-      identityProviderConfigurationDraft(
-        state.data.identityProviderConfigurationBaselines.new,
-      );
-    state.data.identityProviderConfigurationErrorId = null;
-    state.error = null;
-    render();
-    return;
-  }
-  if (action === "admin-saml-provider-create") {
-    if (state.busy || state.offline || !adminRouteAllowed("identity-providers"))
-      return;
-    const baseline = {
-      ...defaultIdentityProviderConfiguration(),
-      providerType: "saml",
-    };
-    state.data.identityProviderConfigurationOpenId = "new-saml";
-    state.data.identityProviderConfigurationBaselines ??= {};
-    state.data.identityProviderConfigurationDrafts ??= {};
-    state.data.identityProviderConfigurationBaselines["new-saml"] = baseline;
-    state.data.identityProviderConfigurationDrafts["new-saml"] =
-      identityProviderConfigurationDraft(baseline);
-    state.data.identityProviderConfigurationErrorId = null;
-    state.error = null;
-    render();
-    return;
-  }
-  if (
-    action === "admin-identity-provider-config-edit" ||
-    action === "admin-saml-provider-config-edit"
-  ) {
-    if (state.busy || state.offline || !adminRouteAllowed("identity-providers"))
-      return;
-    const id = element.dataset.id ?? "";
-    const provider = (state.data.identityProviders?.content ?? []).find(
-      (item) => item.id === id,
-    );
-    const expectedProviderType =
-      action === "admin-saml-provider-config-edit" ? "saml" : "oidc";
-    if (
-      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
-      !provider ||
-      provider.providerType !== expectedProviderType
-    )
-      return;
-    if (state.data.identityProviderConfigurationOpenId === id) {
-      state.data.identityProviderConfigurationOpenId = null;
-      delete state.data.identityProviderConfigurationDrafts?.[id];
-      delete state.data.identityProviderConfigurationBaselines?.[id];
-      state.data.identityProviderConfigurationErrorId = null;
-      render();
-      return;
-    }
-    state.busy = `identity-provider-config-load:${id}`;
-    state.error = null;
-    render();
-    try {
-      const response = await request(
-        `/api/admin/identity-providers/${encodeURIComponent(id)}`,
-      );
-      if (
-        response?.id !== id ||
-        response.providerType !== expectedProviderType ||
-        typeof response.registrationId !== "string" ||
-        (expectedProviderType === "oidc" &&
-          typeof response.clientId !== "string")
-      )
-        throw new Error("invalid_identity_provider_connection_response");
-      const baseline = safeIdentityProviderConfiguration(response);
-      state.data.identityProviderConfigurationBaselines ??= {};
-      state.data.identityProviderConfigurationDrafts ??= {};
-      state.data.identityProviderConfigurationBaselines[id] = baseline;
-      state.data.identityProviderConfigurationDrafts[id] =
-        identityProviderConfigurationDraft(baseline);
-      state.data.identityProviderConfigurationOpenId = id;
-      state.data.identityProviderConfigurationErrorId = null;
-    } catch {
-      /* The API adapter supplies localized authorization and transport feedback. */
-    }
-    state.busy = null;
     render();
     return;
   }
@@ -13345,90 +12585,6 @@ async function action(action, element) {
     render();
     return;
   }
-  if (action === "admin-client-metadata-edit") {
-    if (state.busy || state.offline) return;
-    const id = element.dataset.id;
-    const client = nativeClientRows().some((item) => item.id === id);
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !client) return;
-    if (state.data.clientMetadataEditId === id) {
-      state.data.clientMetadataEditId = null;
-      delete state.data.clientMetadataDrafts?.[id];
-      state.data.clientMetadataErrorId = null;
-      render();
-      return;
-    }
-    state.busy = `client-metadata-load:${id}`;
-    state.error = null;
-    render();
-    try {
-      const metadata = await request(
-        `/api/admin/clients/${encodeURIComponent(id)}/native-metadata`,
-      );
-      state.data.clientMetadataEditId = id;
-      state.data.clientMetadataDrafts ??= {};
-      state.data.clientMetadataDrafts[id] = {
-        clientName: metadata.clientName,
-      };
-      state.data.clientMetadataErrorId = null;
-    } catch {
-      /* request rendered localized transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
-  if (action === "admin-client-configuration-edit") {
-    if (state.busy || state.offline || !adminRouteAllowed("clients")) return;
-    const id = element.dataset.id ?? "";
-    const client = nativeClientRows().find((entry) => entry.id === id);
-    if (
-      !/^[A-Za-z0-9_-]{1,100}$/.test(id) ||
-      !client ||
-      client.clientId === "admin-console" ||
-      !state.data.adminAccess?.manageClients
-    )
-      return;
-    if (state.data.clientConfigurationEditId === id) {
-      state.data.clientConfigurationEditId = null;
-      state.data.clientConfiguration = null;
-      delete state.data.clientConfigurationDrafts?.[id];
-      state.data.clientConfigurationErrorId = null;
-      state.error = null;
-      render();
-      return;
-    }
-    state.busy = `client-configuration-load:${id}`;
-    state.error = null;
-    render();
-    try {
-      const configuration = await request(
-        `/api/admin/clients/${encodeURIComponent(id)}`,
-      );
-      if (
-        configuration?.id !== id ||
-        typeof configuration.clientId !== "string" ||
-        !Array.isArray(configuration.clientAuthenticationMethods) ||
-        !Array.isArray(configuration.authorizationGrantTypes)
-      )
-        throw new Error("invalid_client_configuration_response");
-      const {
-        serviceAccountUsername: _serviceAccountUsername,
-        ...safeConfiguration
-      } = configuration;
-      void _serviceAccountUsername;
-      state.data.clientConfiguration = safeConfiguration;
-      state.data.clientConfigurationEditId = id;
-      state.data.clientConfigurationDrafts ??= {};
-      state.data.clientConfigurationDrafts[id] =
-        clientConfigurationDraft(safeConfiguration);
-      state.data.clientConfigurationErrorId = null;
-    } catch {
-      /* request rendered localized authorization, timeout, or transport feedback */
-    }
-    state.busy = null;
-    render();
-    return;
-  }
   if (action === "admin-client-configuration-cancel") {
     if (state.busy) return;
     const id = element.dataset.id ?? "";
@@ -13439,61 +12595,6 @@ async function action(action, element) {
     state.data.clientConfigurationErrorId = null;
     state.error = null;
     render({ preserveDrafts: false });
-    return;
-  }
-  if (action === "admin-client-metadata-cancel") {
-    if (state.busy) return;
-    const id = element.dataset.id;
-    if (state.data.clientMetadataEditId !== id) return;
-    state.data.clientMetadataEditId = null;
-    delete state.data.clientMetadataDrafts?.[id];
-    state.data.clientMetadataErrorId = null;
-    state.error = null;
-    render();
-    return;
-  }
-  if (action === "admin-client-scope-assignments-toggle") {
-    if (state.busy || state.offline) return;
-    const id = element.dataset.id;
-    const client = nativeClientRows().some((item) => item.id === id);
-    if (!/^[A-Za-z0-9_-]{1,100}$/.test(id ?? "") || !client) return;
-    if (state.data.clientScopeAssignmentsOpenId === id) {
-      state.data.clientScopeAssignmentsOpenId = null;
-      render();
-      return;
-    }
-    const cached = state.data.clientScopeAssignments?.[id];
-    state.data.clientScopeAssignmentsOpenId = id;
-    state.data.clientScopeAssignmentErrorId = null;
-    state.error = null;
-    if (cached) {
-      state.data.clientScopeAssignmentDrafts ??= {};
-      state.data.clientScopeAssignmentDrafts[id] = {
-        defaultScopes: [...(cached.defaultScopes ?? [])],
-        optionalScopes: [...(cached.optionalScopes ?? [])],
-      };
-      render();
-      return;
-    }
-    state.busy = `client-scope-assignments-load:${id}`;
-    render();
-    try {
-      const assignments = await request(
-        `/api/admin/clients/${encodeURIComponent(id)}/scope-assignments`,
-      );
-      state.data.clientScopeAssignments ??= {};
-      state.data.clientScopeAssignments[id] = assignments;
-      state.data.clientScopeAssignmentDrafts ??= {};
-      state.data.clientScopeAssignmentDrafts[id] = {
-        defaultScopes: [...(assignments.defaultScopes ?? [])],
-        optionalScopes: [...(assignments.optionalScopes ?? [])],
-      };
-    } catch {
-      state.data.clientScopeAssignmentsOpenId = null;
-      /* request rendered localized authorization or transport feedback */
-    }
-    state.busy = null;
-    render();
     return;
   }
   if (action === "admin-client-scope-assignments-cancel") {
@@ -13511,16 +12612,6 @@ async function action(action, element) {
     state.data.clientScopeAssignmentErrorId = null;
     state.error = null;
     render({ preserveDrafts: false });
-    return;
-  }
-  if (action === "admin-identity-provider-policy-cancel") {
-    if (state.busy) return;
-    const id = element.dataset.id;
-    if (state.data.identityProviderPolicyOpenId !== id) return;
-    state.data.identityProviderPolicyOpenId = null;
-    delete state.data.identityProviderPolicyDrafts?.[id];
-    state.data.identityProviderPolicyErrorId = null;
-    render();
     return;
   }
   if (
@@ -14127,6 +13218,55 @@ async function action(action, element) {
     }
     return;
   }
+  if (action === "personal-access-token-toggle") {
+    if (state.busy || !state.data.createdPersonalAccessToken) return;
+    state.data.personalAccessTokenVisible = !state.data.personalAccessTokenVisible;
+    render();
+    return;
+  }
+  if (action === "personal-access-token-dismiss") {
+    if (state.busy) return;
+    state.data.createdPersonalAccessToken = null;
+    state.data.personalAccessTokenVisible = false;
+    render();
+    return;
+  }
+  if (action === "personal-access-token-copy") {
+    if (state.busy || !state.data.createdPersonalAccessToken?.token) return;
+    state.busy = "personal-access-token-copy";
+    render();
+    try {
+      await navigator.clipboard.writeText(state.data.createdPersonalAccessToken.token);
+      state.notice = text("personalAccessTokenCopy");
+    } catch {
+      state.error = { message: text("personalAccessTokenCopyFailed") };
+    }
+    state.busy = null;
+    render();
+    return;
+  }
+  if (action === "personal-access-token-revoke") {
+    const tokenId = element.closest(".list-item")?.dataset.id;
+    if (!tokenId || !confirm(text("personalAccessTokenRevokeConfirm"))) return;
+    state.busy = "personal-access-token-revoke";
+    state.error = null;
+    state.notice = null;
+    render();
+    try {
+      await request(`/api/account/personal-access-tokens/${encodeURIComponent(tokenId)}`, {
+        method: "DELETE",
+      });
+      state.data.personalAccessTokens = state.data.personalAccessTokens.filter(
+        (token) => token.id !== tokenId,
+      );
+      state.notice = text("personalAccessTokenRevoked");
+    } catch {
+      /* request rendered the localized API error. */
+    }
+    state.busy = null;
+    render();
+    return;
+  }
   if (action === "social-remove") {
     if (!confirm(text("socialRemoveConfirm"))) return;
     const item = element.closest(".list-item");
@@ -14508,43 +13648,6 @@ function bind() {
     }),
   );
   document
-    .querySelectorAll("[data-client-scope-role-page]")
-    .forEach((element) =>
-      element.addEventListener("click", () => {
-        if (state.busy || element.disabled || state.offline) return;
-        const scopeId = element.dataset.scopeId;
-        const kind = element.dataset.clientScopeRolePage;
-        const page = Number(element.dataset.page);
-        const mapping = state.data.adminClientScopeRoleMappings?.[scopeId];
-        const candidatesKey =
-          kind === "applicationRoles"
-            ? "applicationRoleCandidates"
-            : "clientRoleCandidates";
-        const currentPage = mapping?.[candidatesKey];
-        if (
-          typeof scopeId !== "string" ||
-          !/^[A-Za-z0-9_-]{1,100}$/.test(scopeId) ||
-          !["applicationRoles", "clientRoleIds"].includes(kind) ||
-          !Number.isSafeInteger(page) ||
-          page < 0 ||
-          !currentPage ||
-          page >= Number(currentPage.totalPages ?? 0)
-        )
-          return;
-        state.busy = `client-scope-role-page:${scopeId}:${kind}`;
-        state.error = null;
-        render();
-        void loadClientScopeRoleCandidates(scopeId, kind, page)
-          .catch(() => {
-            /* request rendered localized authorization or transport feedback */
-          })
-          .finally(() => {
-            state.busy = null;
-            render();
-          });
-      }),
-    );
-  document
     .getElementById("admin-client-search")
     ?.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -14572,22 +13675,6 @@ function bind() {
         state.busy = null;
         render();
       });
-    }),
-  );
-  document.querySelectorAll("[data-client-role-page]").forEach((element) =>
-    element.addEventListener("click", () => {
-      if (state.busy || element.disabled) return;
-      const clientId = element.dataset.clientRolePage ?? "";
-      const nextPage = Number(element.dataset.page);
-      const panel = state.data.clientRoles?.[clientId];
-      if (!panel?.open || !Number.isSafeInteger(nextPage) || nextPage < 0)
-        return;
-      void loadClientRoles(
-        clientId,
-        nextPage,
-        panel.query ?? "",
-        `client-role-page:${clientId}`,
-      );
     }),
   );
   document
@@ -15074,6 +14161,22 @@ function bind() {
       });
     }),
   );
+  const patExpiration = document.getElementById("personalAccessTokenExpiration");
+  if (patExpiration) {
+    const customDate = document.querySelector("[data-pat-custom-date]");
+    const selected = patExpiration.value === "custom";
+    if (customDate) {
+      customDate.hidden = !selected;
+      customDate.querySelector("input").required = selected;
+    }
+  }
+  patExpiration?.addEventListener("change", (event) => {
+    const customDate = document.querySelector("[data-pat-custom-date]");
+    if (!customDate) return;
+    const selected = event.currentTarget.value === "custom";
+    customDate.hidden = !selected;
+    customDate.querySelector("input").required = selected;
+  });
   document.querySelectorAll("[data-action]").forEach((element) =>
     element.addEventListener("click", (event) => {
       if (element.tagName === "A") event.preventDefault();
@@ -15196,19 +14299,15 @@ function bind() {
         mapping.draft = {
           applicationRoles: [
             ...new Set(
-              [
-                ...panel.querySelectorAll(
-                  'input[name="applicationRoles"]:checked',
-                ),
-              ]
-                .map((input) => input.value.trim())
+              [...panel.querySelectorAll('select[name="applicationRoles"] option:checked')]
+                .map((option) => option.value.trim())
                 .filter(Boolean),
             ),
           ],
           clientRoleIds: [
             ...new Set(
-              [...panel.querySelectorAll('input[name="clientRoleIds"]:checked')]
-                .map((input) => Number(input.value))
+              [...panel.querySelectorAll('select[name="clientRoleIds"] option:checked')]
+                .map((option) => Number(option.value))
                 .filter((id) => Number.isSafeInteger(id) && id > 0),
             ),
           ],

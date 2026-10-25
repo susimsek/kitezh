@@ -4,16 +4,88 @@ appId: io.github.susimsek.kitezh.mobile
 - launchApp:
     clearState: false
 - extendedWaitUntil:
-    visible: "Kitezh logo"
+    visible: "Kitezh logo|Continue|Devam et|Account Console|Hesap Konsolu"
     timeout: 180000
-- tapOn: "Settings|Ayarlar"
+- runFlow:
+    when:
+      visible: "Account Console|Hesap Konsolu"
+    commands:
+      - tapOn:
+          id: account-tab-settings
+- runFlow:
+    when:
+      visible: "Continue|Devam et"
+    commands:
+      - tapOn:
+          id: landing-settings
 - assertVisible: "Settings|Ayarlar"
-- tapOn: "English|İngilizce"
+- tapOn:
+    id: settings-locale-system
+- assertVisible:
+    id: settings-locale-system
+    selected: true
+- tapOn:
+    id: settings-locale-english
 - assertVisible: "Settings"
-- tapOn: "Turkish|Türkçe"
+- assertVisible:
+    id: settings-locale-english
+    selected: true
+- tapOn:
+    id: settings-locale-turkish
 - assertVisible: "Ayarlar"
 - assertVisible: "Görünüm"
-- tapOn: "Koyu"
+- assertVisible:
+    id: settings-locale-turkish
+    selected: true
+- tapOn:
+    id: settings-theme-system
+- assertVisible:
+    id: settings-theme-system
+    selected: true
+- tapOn:
+    id: settings-theme-dark
 - assertVisible: "Koyu"
-- tapOn: "Açık"
+- assertVisible:
+    id: settings-theme-dark
+    selected: true
+- tapOn:
+    id: settings-theme-light
 - assertVisible: "Açık"
+- assertVisible:
+    id: settings-theme-light
+    selected: true
+- stopApp
+- launchApp:
+    clearState: false
+- extendedWaitUntil:
+    visible: "Kitezh logo|Continue|Devam et|Account Console|Hesap Konsolu"
+    timeout: 180000
+- runFlow:
+    when:
+      visible: "Account Console|Hesap Konsolu"
+    commands:
+      - tapOn:
+          id: account-tab-settings
+- runFlow:
+    when:
+      visible: "Continue|Devam et"
+    commands:
+      - tapOn:
+          id: landing-settings
+- assertVisible: "Ayarlar"
+- assertVisible:
+    id: settings-locale-turkish
+    selected: true
+- assertVisible:
+    id: settings-theme-light
+    selected: true
+- tapOn:
+    id: settings-locale-system
+- assertVisible:
+    id: settings-locale-system
+    selected: true
+- tapOn:
+    id: settings-theme-system
+- assertVisible:
+    id: settings-theme-system
+    selected: true

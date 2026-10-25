@@ -6,25 +6,97 @@ appId: io.github.susimsek.kitezh.mobile
 - extendedWaitUntil:
     visible: "Kitezh logo"
     timeout: 180000
-- tapOn: "Settings|Ayarlar"
-- tapOn: "English|İngilizce"
-- tapOn: "Back|Geri"
-- tapOn: "Continue|Devam et"
-- tapOn: "Sign in"
+- runFlow:
+    when:
+      visible: "Account Console|Hesap Konsolu"
+    commands:
+      - tapOn:
+          id: account-tab-settings
+      - tapOn:
+          id: settings-locale-english
+      - tapOn:
+          text: "^Account Console$"
+      - extendedWaitUntil:
+          visible: "fixture-user"
+          timeout: 30000
+      - scrollUntilVisible:
+          element:
+            text: "Sign out|Oturumu kapat"
+          direction: DOWN
+      - tapOn: "Sign out|Oturumu kapat"
+      - tapOn:
+          text: "^Continue$"
+          optional: true
+- runFlow:
+    when:
+      visible: "Continue|Devam et"
+    commands:
+      - tapOn:
+          id: landing-settings
+      - tapOn:
+          id: settings-locale-english
+      - tapOn: "Back|Geri"
+      - tapOn: "Continue|Devam et"
+      - assertVisible: "Sign in|Giriş yap"
+- tapOn: "Sign in|Giriş yap"
+# Android may show Chrome's first-run account prompt on a clean emulator.
+- tapOn:
+    text: "Use without an account"
+    optional: true
 # iOS may ask once to allow the app to use the local fixture domain for sign-in.
 - tapOn:
-    text: "Continue"
+    text: "^Continue$"
     optional: true
 - tapOn:
     text: "Stay signed out"
     optional: true
-- tapOn: "Continue with fixture account"
+- tapOn: "Continue with fixture account|Test hesabıyla devam et"
 - extendedWaitUntil:
-    visible: "Account Console"
+    visible: "Account Console|Hesap Konsolu"
     timeout: 180000
 - extendedWaitUntil:
     visible: "fixture-user"
     timeout: 180000
+- tapOn: "Applications|Uygulamalar"
+- assertVisible: "Authorized applications|Yetkili uygulamalar"
+- assertVisible: "Sign-in requests|Oturum açma istekleri"
+- assertVisible: "Fixture approve request"
+- tapOn: "Approve"
+- extendedWaitUntil:
+    visible: "Sign-in request approved."
+    timeout: 10000
+- assertVisible: "Fixture deny request"
+- tapOn: "Deny"
+- extendedWaitUntil:
+    visible: "Sign-in request denied."
+    timeout: 10000
+- tapOn: "Account Console"
+- scroll
+- tapOn: "Two-factor authentication|İki faktörlü kimlik doğrulama"
+- assertVisible: "Set up authenticator"
+- tapOn: "Set up authenticator"
+- assertVisible: "Authenticator code"
+- tapOn: "Back"
+- scroll
+- scrollUntilVisible:
+    element:
+      text: "Social accounts"
+    direction: DOWN
+- tapOn: "Social accounts"
+- assertVisible: "Google"
+- tapOn: "Connect in browser"
+- tapOn:
+    text: "^Continue$"
+    optional: true
+- tapOn: "Continue with fixture account"
+- tapOn:
+    text: "^Open$"
+    optional: true
+- extendedWaitUntil:
+    visible: "Connected"
+    timeout: 60000
+- tapOn: "Back"
+- scroll
 - scrollUntilVisible:
     element:
       text: "Sign out"
@@ -32,6 +104,6 @@ appId: io.github.susimsek.kitezh.mobile
 - tapOn: "Sign out"
 # iOS asks separately when the logout endpoint opens the local fixture domain.
 - tapOn:
-    text: "Continue"
+    text: "^Continue$"
     optional: true
 - assertVisible: "Sign in"

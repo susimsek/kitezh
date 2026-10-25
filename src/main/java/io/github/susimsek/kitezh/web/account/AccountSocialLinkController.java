@@ -91,6 +91,23 @@ public class AccountSocialLinkController {
                 authentication.getName(), provider, request, baseUrl);
     }
 
+    @PostMapping("/social-links/{provider}/mobile/start")
+    @Operation(
+            summary = "Start a native mobile social account link",
+            description =
+                    "Creates a short-lived PKCE-bound browser handoff for the authenticated"
+                            + " mobile account. The callback is fixed to the Kitezh mobile URI.")
+    @ApiResponse(responseCode = "200", description = "Mobile social-link handoff created.")
+    DesktopSocialLinkStartResponseDTO startMobileLink(
+            Authentication authentication,
+            @PathVariable String provider,
+            @Valid @RequestBody DesktopSocialLinkStartRequestDTO request,
+            HttpServletRequest httpRequest) {
+        String baseUrl = requestBaseUrl(httpRequest);
+        return desktopSocialLinkTransactionService.startMobile(
+                authentication.getName(), provider, request, baseUrl);
+    }
+
     @PostMapping("/social-links/desktop/complete")
     @Operation(
             summary = "Complete a native desktop social account link",
@@ -101,5 +118,25 @@ public class AccountSocialLinkController {
             Authentication authentication,
             @Valid @RequestBody DesktopSocialLinkCompleteRequestDTO request) {
         return desktopSocialLinkTransactionService.complete(authentication.getName(), request);
+    }
+
+    @PostMapping("/social-links/mobile/complete")
+    @Operation(
+            summary = "Complete a native mobile social account link",
+            description =
+                    "Consumes the one-time callback code after the provider callback succeeds.")
+    @ApiResponse(responseCode = "200", description = "Mobile social link completed.")
+    DesktopSocialLinkCompleteResponseDTO completeMobileLink(
+            Authentication authentication,
+            @Valid @RequestBody DesktopSocialLinkCompleteRequestDTO request) {
+        return desktopSocialLinkTransactionService.complete(authentication.getName(), request);
+    }
+
+    private static String requestBaseUrl(HttpServletRequest httpRequest) {
+        return ServletUriComponentsBuilder.fromRequestUri(httpRequest)
+                .replacePath(null)
+                .replaceQuery(null)
+                .build()
+                .toUriString();
     }
 }

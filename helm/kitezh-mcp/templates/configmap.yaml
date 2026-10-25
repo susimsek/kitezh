@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "kitezh-mcp.fullname" . }}
+  labels:
+    {{ include "kitezh-mcp.labels" . | nindent 4 }}
+data:
+  application.yml: |
+    spring:
+      profiles:
+        active: {{ .Values.spring.profiles.active | quote }}
+    app:
+      authorization-server:
+        issuer: {{ .Values.app.authorizationServer.issuer | quote }}
+      security:
+        jwk-set-uri: {{ .Values.app.security.jwkSetUri | quote }}
+        audience: {{ .Values.app.security.audience | quote }}
+      api:
+        base-url: {{ .Values.app.api.baseUrl | quote }}
+      mcp:
+        public-url: {{ .Values.app.mcp.publicUrl | quote }}
+        allowed-origins: {{ .Values.app.mcp.allowedOrigins | quote }}
+        allow-local-hosts: {{ .Values.app.mcp.allowLocalHosts }}
+        read-only: {{ .Values.app.mcp.readOnly }}
+        tools:
+          toolsets: {{ .Values.app.mcp.tools.toolsets | quote }}
+          additional-tools: {{ .Values.app.mcp.tools.additionalTools | quote }}
+          allowlist: {{ .Values.app.mcp.tools.allowlist | quote }}

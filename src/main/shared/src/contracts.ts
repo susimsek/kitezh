@@ -23,6 +23,11 @@ export type NativeClientCapabilities = {
   capabilities: NativeClientCapability[];
 };
 
+export type MobileAuthServerCapabilities = {
+  contractVersion: number;
+  capabilities: string[];
+};
+
 export type DesktopUpdateStatus =
   | { state: "unsupported" }
   | { state: "checking" }

@@ -1,6 +1,7 @@
 package io.github.susimsek.kitezh.config.security;
 
 import io.github.susimsek.kitezh.service.DesktopSocialLinkTransactionService;
+import io.github.susimsek.kitezh.service.MobileSocialLoginTransactionService;
 import io.github.susimsek.kitezh.service.SocialAccountLinkRequiredException;
 import io.github.susimsek.kitezh.service.SocialLoginService;
 import io.github.susimsek.kitezh.service.SocialTokenService;
@@ -44,6 +45,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
     private final SocialTokenService socialTokenService;
     private final MfaService mfaService;
     private final DesktopSocialLinkTransactionService desktopSocialLinkTransactionService;
+    private final MobileSocialLoginTransactionService mobileSocialLoginTransactionService;
     private final AuthenticationFailureHandler failureHandler =
             new SimpleUrlAuthenticationFailureHandler("/login?error");
     private final AuthenticationFailureHandler accountLinkFailureHandler =
@@ -58,6 +60,26 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
             SocialTokenService socialTokenService,
             MfaService mfaService,
             DesktopSocialLinkTransactionService desktopSocialLinkTransactionService) {
+        this(
+                socialLoginService,
+                userDetailsService,
+                securityContextRepository,
+                authorizedClientRepository,
+                socialTokenService,
+                mfaService,
+                desktopSocialLinkTransactionService,
+                null);
+    }
+
+    public SocialLoginAuthenticationSuccessHandler(
+            SocialLoginService socialLoginService,
+            UserDetailsService userDetailsService,
+            SecurityContextRepository securityContextRepository,
+            OAuth2AuthorizedClientRepository authorizedClientRepository,
+            SocialTokenService socialTokenService,
+            MfaService mfaService,
+            DesktopSocialLinkTransactionService desktopSocialLinkTransactionService,
+            MobileSocialLoginTransactionService mobileSocialLoginTransactionService) {
         this.socialLoginService = socialLoginService;
         this.userDetailsService = userDetailsService;
         this.securityContextRepository = securityContextRepository;
@@ -65,6 +87,7 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
         this.socialTokenService = socialTokenService;
         this.mfaService = mfaService;
         this.desktopSocialLinkTransactionService = desktopSocialLinkTransactionService;
+        this.mobileSocialLoginTransactionService = mobileSocialLoginTransactionService;
     }
 
     public SocialLoginAuthenticationSuccessHandler(
@@ -228,10 +251,16 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
             boolean socialLink,
             boolean providerMfaRequired)
             throws IOException, ServletException {
+        String mobileAuthorizationUrl =
+                mobileSocialLoginTransactionService == null
+                        ? null
+                        : mobileSocialLoginTransactionService.consume(request.getSession(false));
         if (socialLink) {
             response.sendRedirect("/account/security?social_linked=1");
         } else if (providerMfaRequired) {
-            requireProviderMfa(request, response);
+            requireProviderMfa(request, response, mobileAuthorizationUrl);
+        } else if (mobileAuthorizationUrl != null) {
+            response.sendRedirect(mobileAuthorizationUrl);
         } else {
             delegate.onAuthenticationSuccess(request, response, localAuthentication);
         }
@@ -251,10 +280,14 @@ public class SocialLoginAuthenticationSuccessHandler implements AuthenticationSu
         }
     }
 
-    private void requireProviderMfa(HttpServletRequest request, HttpServletResponse response)
+    private void requireProviderMfa(
+            HttpServletRequest request, HttpServletResponse response, String mobileAuthorizationUrl)
             throws IOException {
         SavedRequest savedRequest = new HttpSessionRequestCache().getRequest(request, response);
-        String returnTo = savedRequest == null ? "/admin" : savedRequest.getRedirectUrl();
+        String returnTo =
+                mobileAuthorizationUrl != null
+                        ? mobileAuthorizationUrl
+                        : savedRequest == null ? "/admin" : savedRequest.getRedirectUrl();
         request.getSession(true).setAttribute(MfaAuthorizationFilter.MFA_PENDING_REQUEST, returnTo);
         response.sendRedirect(
                 "/mfa?return_to="

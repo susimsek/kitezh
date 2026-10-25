@@ -89,6 +89,24 @@ test("native role list is compact, protects built-in roles and sends bounded pag
     assert.ok(calls.some(({ path }) => path.includes("sort=name%2Cdesc")));
     const menu = document.querySelector(".role-menu");
     menu.open = true;
+    const menuItems = [...menu.querySelectorAll("button:not(:disabled)")];
+    assert.ok(menuItems.length > 0);
+    menu.dispatchEvent(
+      new document.defaultView.KeyboardEvent("keydown", {
+        key: "ArrowDown",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    assert.equal(document.activeElement, menuItems[0]);
+    menu.dispatchEvent(
+      new document.defaultView.KeyboardEvent("keydown", {
+        key: "ArrowUp",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    assert.equal(document.activeElement, menuItems[0]);
     menu.dispatchEvent(
       new document.defaultView.KeyboardEvent("keydown", {
         key: "Escape",
@@ -97,6 +115,89 @@ test("native role list is compact, protects built-in roles and sends bounded pag
     );
     assert.equal(menu.open, false);
     assert.equal(document.activeElement, menu.querySelector("summary"));
+  } finally {
+    h.restore();
+  }
+});
+
+test("role detail corrects an out-of-range backend page and reloads the last valid page", async () => {
+  const h = await renderConsole("admin");
+  try {
+    h.setResponse(listPath, "GET", () => wirePage);
+    h.setResponse(detailPath, "GET", () => ({
+      ...detail,
+      users: {
+        content: [],
+        page: { size: 10, number: 4, totalElements: 15, totalPages: 2 },
+      },
+    }));
+    const lastPagePath =
+      "/api/admin/roles/ROLE_USER?q=&page=1&size=10&sort=username%2Casc";
+    h.setResponse(lastPagePath, "GET", () => ({
+      ...detail,
+      users: {
+        content: [],
+        page: { size: 10, number: 1, totalElements: 15, totalPages: 2 },
+      },
+    }));
+    await settle();
+    h.document.querySelector('[data-route="roles"]').click();
+    await settle();
+    h.document
+      .querySelector('[data-action="role-open"][data-id="ROLE_USER"]')
+      .click();
+    await settle();
+    h.document
+      .querySelector('[data-action="role-tab"][data-id="users"]')
+      .click();
+    await settle();
+
+    assert.ok(h.calls.some(({ path }) => path === detailPath));
+    assert.ok(h.calls.some(({ path }) => path === lastPagePath));
+    assert.match(
+      h.document.querySelector(".admin-pagination-controls").textContent,
+      /2\s*\/\s*2/,
+    );
+  } finally {
+    h.restore();
+  }
+});
+
+test("role detail tabs support ArrowRight, Home, and End keyboard navigation", async () => {
+  const h = await renderConsole("admin");
+  try {
+    await open(h);
+    const tabs = () => [
+      ...h.document.querySelectorAll('[data-action="role-tab"]'),
+    ];
+    assert.ok(tabs().length > 1);
+    tabs()[0].dispatchEvent(
+      new h.document.defaultView.KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.equal(tabs()[1].getAttribute("aria-selected"), "true");
+    tabs()[1].dispatchEvent(
+      new h.document.defaultView.KeyboardEvent("keydown", {
+        key: "End",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.equal(tabs().at(-1).getAttribute("aria-selected"), "true");
+    tabs().at(-1).dispatchEvent(
+      new h.document.defaultView.KeyboardEvent("keydown", {
+        key: "Home",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.equal(tabs()[0].getAttribute("aria-selected"), "true");
   } finally {
     h.restore();
   }
@@ -154,6 +255,19 @@ test("native role search debounces, retains focus and ignores an older response"
       false,
     );
     assert.equal(h.document.activeElement.id, "admin-role-query");
+    const formQuery = h.document.getElementById("admin-role-query");
+    formQuery.value = "FORM";
+    emit(h.document, formQuery);
+    h.document
+      .getElementById("admin-role-search")
+      .dispatchEvent(
+        new h.dom.window.Event("submit", {
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    await settle();
+    assert.ok(h.calls.some(({ path }) => path.includes("q=FORM&page=0")));
     h.document.querySelector('[data-action="role-clear"]').click();
     await settle();
     assert.equal(h.document.getElementById("admin-role-query").value, "");
@@ -205,6 +319,25 @@ test("role detail preserves list state and saves a blank description as null onc
   }
 });
 
+test("role detail keeps overlong descriptions local and shows a field error", async () => {
+  const h = await renderConsole("admin");
+  try {
+    await open(h);
+    const form = h.document.querySelector('[data-form="admin-role-edit"]');
+    form.elements.description.value = "x".repeat(501);
+    emit(h.document, form, "submit");
+    await settle();
+    assert.equal(h.calls.some(({ method }) => method === "PUT"), false);
+    assert.match(h.document.querySelector(".content").textContent, /500/);
+    assert.equal(
+      h.document.querySelector('[name="description"]').value.length,
+      501,
+    );
+  } finally {
+    h.restore();
+  }
+});
+
 test("role users select candidates, exclude current members, filter, assign and confirm removal", async () => {
   const h = await renderConsole("admin");
   let members = [user];
@@ -236,6 +369,34 @@ test("role users select candidates, exclude current members, filter, assign and 
       }),
     );
     const search = h.document.getElementById("role-candidate-user");
+    search.value = "かな";
+    search.dispatchEvent(
+      new h.dom.window.InputEvent("input", {
+        bubbles: true,
+        isComposing: true,
+      }),
+    );
+    await delay();
+    assert.equal(
+      h.calls.some(
+        ({ path }) =>
+          new URL(path, "https://test.invalid").searchParams.get("q") ===
+          "かな",
+      ),
+      false,
+    );
+    search.dispatchEvent(
+      new h.dom.window.CompositionEvent("compositionend", { bubbles: true }),
+    );
+    await delay();
+    await settle();
+    assert.ok(
+      h.calls.some(
+        ({ path }) =>
+          new URL(path, "https://test.invalid").searchParams.get("q") ===
+          "かな",
+      ),
+    );
     search.value = "ada";
     emit(h.document, search);
     await delay();
@@ -419,6 +580,97 @@ test("role loading failures and missing roles do not masquerade as empty members
   }
 });
 
+test("role member candidate failures can be retried and empty results stay explicit", async () => {
+  const h = await renderConsole("admin");
+  try {
+    await open(h);
+    h.document
+      .querySelector('[data-action="role-tab"][data-id="users"]')
+      .click();
+    await settle();
+    const query = h.document.getElementById("role-candidate-user");
+    const retryPath =
+      "/api/admin/roles/ROLE_USER/available-users?q=ada&page=0&size=10&sort=username,asc";
+    h.setResponse(retryPath, "GET", () => ({
+      status: 503,
+      kind: "server",
+      body: null,
+    }));
+    query.value = "ada";
+    emit(h.document, query);
+    await delay();
+    await settle();
+    assert.match(
+      h.document.querySelector('[data-role-candidate="user"]').textContent,
+      /could not be loaded/i,
+    );
+    const retry = h.document.querySelector(
+      '[data-action="role-candidate-retry"][data-id="user"]',
+    );
+    assert.ok(retry);
+    retry.click();
+    await settle();
+    h.setResponse(retryPath, "GET", () => ({ content: [] }));
+    h.document
+      .querySelector('[data-action="role-candidate-retry"][data-id="user"]')
+      .click();
+    await settle();
+    assert.match(
+      h.document.querySelector('[data-role-candidate="user"]').textContent,
+      /no matching candidates found/i,
+    );
+    assert.equal(
+      h.document.querySelector('[data-action="role-candidate-retry"]'),
+      null,
+    );
+  } finally {
+    h.restore();
+  }
+});
+
+test("role member removal can be canceled and retains the row after an API failure", async () => {
+  const h = await renderConsole("admin");
+  try {
+    await open(h);
+    h.document
+      .querySelector('[data-action="role-tab"][data-id="users"]')
+      .click();
+    await settle();
+    const remove = () =>
+      h.document.querySelector('[data-action="role-user-remove"][data-id="8"]');
+    remove().click();
+    await settle();
+    h.document
+      .querySelector('[data-action="role-user-remove-cancel"]')
+      .click();
+    await settle();
+    assert.ok(remove());
+    assert.equal(h.calls.some(({ method }) => method === "DELETE"), false);
+
+    h.setResponse("/api/admin/roles/ROLE_USER/users/8", "DELETE", () => ({
+      status: 503,
+      kind: "server",
+      body: null,
+    }));
+    remove().click();
+    await settle();
+    h.document
+      .querySelector('[data-action="role-user-remove-confirm"][data-id="8"]')
+      .click();
+    await settle();
+    assert.ok(h.calls.some(({ method, path }) =>
+      method === "DELETE" && path.endsWith("/users/8"),
+    ));
+    assert.ok(
+      h.document.querySelector(
+        '[data-action="role-user-remove-confirm"][data-id="8"]',
+      ),
+    );
+  } finally {
+    h.restore();
+  }
+});
+
 test("role deletion refreshes the previous page after deleting the last row", async () => {
   const h = await renderConsole("admin");
   try {
@@ -525,6 +777,72 @@ test("composite candidates require two characters, ignore stale results and pres
     );
     await delay();
     await settle();
+  } finally {
+    h.restore();
+  }
+});
+
+test("role composite search filters malformed, self, and already assigned candidates", async () => {
+  const h = await renderConsole("admin");
+  try {
+    await open(h);
+    const realmPath =
+      "/api/admin/roles/ROLE_USER/available-composites?q=ROLE&page=0&size=10&sort=name,asc";
+    h.setResponse(realmPath, "GET", () => ({
+      content: [
+        { name: "not-a-role" },
+        { name: "ROLE_USER" },
+        { name: "ROLE_EDITOR" },
+        { name: "ROLE_REVIEWER" },
+      ],
+    }));
+    const realmSearch = h.document.getElementById("role-candidate-realm");
+    realmSearch.value = "ROLE";
+    emit(h.document, realmSearch);
+    await delay();
+    await settle();
+    assert.ok(
+      h.document.querySelector(
+        '#role-candidate-select-realm option[value="ROLE_REVIEWER"]',
+      ),
+    );
+    for (const excluded of ["not-a-role", "ROLE_USER", "ROLE_EDITOR"])
+      assert.equal(
+        h.document.querySelector(
+          `#role-candidate-select-realm option[value="${excluded}"]`,
+        ),
+        null,
+      );
+
+    const clientPath =
+      "/api/admin/roles/ROLE_USER/available-client-composites?q=client&page=0&size=10&sort=name,asc";
+    h.setResponse(clientPath, "GET", () => ({
+      content: [
+        { id: 0, clientId: "console", name: "READ" },
+        { id: 43, clientId: "bad/client", name: "READ" },
+        { id: 45, name: "READ" },
+        { id: 44, clientId: "console", name: null },
+        { id: 42, clientId: "demo-client", name: "read" },
+        { id: 43, clientId: "console", name: "REVIEW" },
+      ],
+    }));
+    const clientSearch = h.document.getElementById("role-candidate-client");
+    clientSearch.value = "client";
+    emit(h.document, clientSearch);
+    await delay();
+    await settle();
+    assert.ok(
+      h.document.querySelector(
+        '#role-candidate-select-client option[value="43"]',
+      ),
+    );
+    for (const excluded of ["0", "42", "44", "45"])
+      assert.equal(
+        h.document.querySelector(
+          `#role-candidate-select-client option[value="${excluded}"]`,
+        ),
+        null,
+      );
   } finally {
     h.restore();
   }

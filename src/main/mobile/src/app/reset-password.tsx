@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -10,13 +10,15 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { resetPassword } from "@/api/public-api";
+import { PublicApiError, resetPassword } from "@/api/public-api";
+import { publicErrorMessage } from "@/api/public-error-message";
 import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
 import { MobileFormScrollView } from "@/components/MobileFormScrollView";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
+import { problemFieldErrors } from "../../../shared/src/api.ts";
 
 export default function ResetPasswordScreen() {
   const { dictionary } = useLocale();
@@ -30,16 +32,41 @@ export default function ResetPasswordScreen() {
   const [otpCode, setOtpCode] = useState("");
   const [pending, setPending] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   const submit = async () => {
     if (pending) return;
-    if (!token.trim() || password.length < 12 || password !== confirmPassword) {
-      setError(true);
+    const invalidField = [
+      {
+        name: "token",
+        message: dictionary.resetError,
+        valid: Boolean(token.trim()),
+      },
+      {
+        name: "newPassword",
+        message: dictionary.passwordMinLength,
+        valid: password.length >= 12,
+      },
+      {
+        name: "confirmPassword",
+        message: dictionary.passwordMismatch,
+        valid: password === confirmPassword && Boolean(confirmPassword),
+      },
+    ].find((field) => !field.valid);
+    if (invalidField) {
+      setError(null);
+      setFieldErrors({ [invalidField.name]: invalidField.message });
+      inputRefs.current[
+        ["token", "newPassword", "confirmPassword"].indexOf(
+          invalidField.name,
+        )
+      ]?.focus();
       return;
     }
     setPending(true);
-    setError(false);
+    setError(null);
     try {
       await resetPassword({
         token: token.trim(),
@@ -47,8 +74,15 @@ export default function ResetPasswordScreen() {
         otpCode: otpCode.trim() || undefined,
       });
       setSuccess(true);
-    } catch {
-      setError(true);
+    } catch (cause) {
+      setFieldErrors(problemFieldErrors(cause));
+      setError(
+        publicErrorMessage(
+          cause instanceof PublicApiError ? cause.kind : undefined,
+          dictionary,
+          "resetError",
+        ),
+      );
     } finally {
       setPending(false);
     }
@@ -96,31 +130,50 @@ export default function ResetPasswordScreen() {
         ) : (
           <View style={styles.form}>
             <Field
+              inputRef={(node) => {
+                inputRefs.current[0] = node;
+              }}
               label={dictionary.resetToken}
               value={token}
               onChangeText={(value) => {
                 setToken(value);
-                setError(false);
+                setError(null);
+                setFieldErrors((current) => omitFieldError(current, "token"));
               }}
+              error={fieldErrors.token}
               palette={palette}
             />
             <Field
+              inputRef={(node) => {
+                inputRefs.current[1] = node;
+              }}
               label={dictionary.newPassword}
               value={password}
               onChangeText={(value) => {
                 setPassword(value);
-                setError(false);
+                setError(null);
+                setFieldErrors((current) =>
+                  omitFieldError(current, "newPassword"),
+                );
               }}
+              error={fieldErrors.newPassword}
               palette={palette}
               secureTextEntry
             />
             <Field
+              inputRef={(node) => {
+                inputRefs.current[2] = node;
+              }}
               label={dictionary.confirmPassword}
               value={confirmPassword}
               onChangeText={(value) => {
                 setConfirmPassword(value);
-                setError(false);
+                setError(null);
+                setFieldErrors((current) =>
+                  omitFieldError(current, "confirmPassword"),
+                );
               }}
+              error={fieldErrors.confirmPassword}
               palette={palette}
               secureTextEntry
             />
@@ -132,13 +185,16 @@ export default function ResetPasswordScreen() {
               keyboardType="number-pad"
             />
             {error ? (
-              <Text style={[styles.error, { color: palette.danger }]}>
-                {dictionary.resetError}
+              <Text
+                accessibilityRole="alert"
+                style={[styles.error, { color: palette.danger }]}
+              >
+                {error}
               </Text>
             ) : null}
             <Pressable
               accessibilityRole="button"
-              accessibilityState={{ disabled: pending }}
+              accessibilityState={{ busy: pending, disabled: pending }}
               disabled={pending}
               onPress={() => void submit()}
               style={[
@@ -149,7 +205,12 @@ export default function ResetPasswordScreen() {
                 },
               ]}
             >
-              {pending ? <ActivityIndicator color={palette.onPrimary} /> : null}
+              {pending ? (
+                <ActivityIndicator
+                  accessibilityLabel={dictionary.loading}
+                  color={palette.onPrimary}
+                />
+              ) : null}
               <Text style={{ color: palette.onPrimary, fontWeight: "700" }}>
                 {dictionary.save}
               </Text>
@@ -168,6 +229,8 @@ function Field({
   palette,
   secureTextEntry = false,
   keyboardType = "default",
+  error,
+  inputRef,
 }: Readonly<{
   label: string;
   value: string;
@@ -175,41 +238,73 @@ function Field({
   palette: ReturnType<typeof useTheme>["palette"];
   secureTextEntry?: boolean;
   keyboardType?: "default" | "number-pad";
+  error?: string;
+  inputRef?: (node: TextInput | null) => void;
 }>) {
   return (
     <View>
       <Text style={[styles.label, { color: palette.text }]}>{label}</Text>
       <TextInput
         accessibilityLabel={label}
+        accessibilityHint={error}
         autoCapitalize="none"
         keyboardType={keyboardType}
         onChangeText={onChangeText}
         placeholder={label}
         placeholderTextColor={palette.textMuted}
+        ref={inputRef}
         secureTextEntry={secureTextEntry}
         style={[
           styles.input,
-          { borderColor: palette.border, color: palette.text },
+          {
+            borderColor: error ? palette.danger : palette.border,
+            color: palette.text,
+          },
         ]}
         value={value}
       />
+      {error ? (
+        <Text
+          accessibilityRole="alert"
+          style={[styles.fieldError, { color: palette.danger }]}
+        >
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
+function omitFieldError(
+  errors: Record<string, string>,
+  field: string,
+): Record<string, string> {
+  const { [field]: _removed, ...remaining } = errors;
+  return remaining;
+}
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  content: { padding: spacing.xl, paddingBottom: spacing.xxl },
+  content: {
+    alignSelf: "center",
+    maxWidth: 560,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl,
+    width: "100%",
+  },
   back: {
     alignItems: "center",
     flexDirection: "row",
     gap: spacing.xs,
     marginBottom: spacing.lg,
+    minHeight: 44,
+    minWidth: 44,
   },
   title: { fontSize: 28, fontWeight: "800", marginTop: spacing.lg },
   help: { fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
   form: { gap: spacing.sm, marginTop: spacing.xl },
   label: { fontSize: 14, fontWeight: "700", marginBottom: spacing.xs },
+  fieldError: { fontSize: 13, lineHeight: 18, marginTop: spacing.xs },
   input: {
     borderRadius: radii.sm,
     borderWidth: 1,

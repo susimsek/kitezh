@@ -474,6 +474,36 @@ class StandardRequiredActionHandlerTest {
     }
 
     @Test
+    void coversRemainingProfilePasswordAndTotpPendingDecisions() {
+        LoginSettingsService settings = mock(LoginSettingsService.class);
+        PasswordPolicyService policy = mock(PasswordPolicyService.class);
+        when(settings.isOtpRequired()).thenReturn(true);
+        when(policy.isExpired(org.mockito.ArgumentMatchers.any())).thenReturn(false);
+        StandardRequiredActionHandler handler =
+                new StandardRequiredActionHandler(
+                        validator, policy, null, null, settings, null, null, null, null);
+        UserEntity user = new UserEntity();
+        user.setUsername("alice");
+        user.setFirstName("Ada");
+        user.setLastName(" ");
+        user.setEmail("ada@example.test");
+        RequiredActionDefinitionEntity definition = new RequiredActionDefinitionEntity();
+
+        definition.setActionKey("UPDATE_PROFILE");
+        assertThat(handler.isPending(user, definition, false)).isTrue();
+        user.setLastName("Lovelace");
+        user.setEmail(" ");
+        assertThat(handler.isPending(user, definition, false)).isTrue();
+        user.setEmail("ada@example.test");
+        definition.setActionKey("UPDATE_PASSWORD");
+        assertThat(handler.isPending(user, definition, false)).isFalse();
+        definition.setActionKey("CONFIGURE_TOTP");
+        assertThat(handler.isPending(user, definition, false)).isTrue();
+        user.setTotpEnabled(true);
+        assertThat(handler.isPending(user, definition, false)).isFalse();
+    }
+
+    @Test
     void completesPasswordlessAndTotpWithoutSessionInvalidation() {
         WebAuthnService webAuthn = mock(WebAuthnService.class);
         when(webAuthn.hasCredential("alice")).thenReturn(true);

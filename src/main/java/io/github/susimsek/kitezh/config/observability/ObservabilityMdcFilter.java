@@ -47,65 +47,6 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
     private static final String DIRECTION = "direction";
     private static final String INBOUND = "inbound";
     private static final String TYPE = "type";
-    private static final String AUTHORIZATION = "authorization";
-    private static final Set<String> ALWAYS_MASKED_HEADERS =
-            Set.of(AUTHORIZATION, "cookie", "set-cookie", "proxy-authorization");
-    private static final Set<String> ALWAYS_MASKED_BODY_FIELDS =
-            Set.of(
-                    "access_token",
-                    "refresh_token",
-                    "id_token",
-                    "client_secret",
-                    "password",
-                    AUTHORIZATION,
-                    "cookie",
-                    "token",
-                    "secret",
-                    "api_key",
-                    "assertion",
-                    "saml_response",
-                    "samlresponse",
-                    "samlrequest",
-                    "relaystate",
-                    "private_key",
-                    "code",
-                    "code_verifier",
-                    "captchatoken",
-                    "response",
-                    "sitekey",
-                    "apikey",
-                    "auth_req_id",
-                    "client_notification_token",
-                    "id_token_hint",
-                    "login_hint_token",
-                    "user_code",
-                    "dpop",
-                    "dpop_proof",
-                    "jwk");
-    private static final Set<String> ALWAYS_MASKED_PARAMETERS =
-            Set.of(
-                    "access_token",
-                    "refresh_token",
-                    "id_token",
-                    "client_secret",
-                    "client_assertion",
-                    "password",
-                    AUTHORIZATION,
-                    "token",
-                    "secret",
-                    "api_key",
-                    "assertion",
-                    "samlresponse",
-                    "samlrequest",
-                    "relaystate",
-                    "code",
-                    "state",
-                    "nonce",
-                    "request",
-                    "request_uri",
-                    "login_hint_token",
-                    "user_code");
-
     private static final String[] MDC_KEYS = {
         CLIENT_ID, USER_ID, SESSION_ID, IP_ADDRESS, TRACE_ID, SPAN_ID
     };
@@ -115,7 +56,6 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
     private final Set<String> maskedHeaders;
     private final Set<String> maskedBodyFields;
     private final Set<String> maskedParameters;
-    private final Set<String> maskedCookies;
     private final List<Pattern> excludedPaths;
     private final int maxBodyBytes;
 
@@ -143,12 +83,8 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
         this.serverProperties = serverProperties;
         this.replacement = obfuscate.getReplacement();
         this.maskedHeaders = new HashSet<>(lowerCaseSet(obfuscate.getHeaders()));
-        this.maskedHeaders.addAll(ALWAYS_MASKED_HEADERS);
         this.maskedBodyFields = new HashSet<>(lowerCaseSet(obfuscate.getBodyFields()));
-        this.maskedBodyFields.addAll(ALWAYS_MASKED_BODY_FIELDS);
         this.maskedParameters = new HashSet<>(lowerCaseSet(obfuscate.getParameters()));
-        this.maskedParameters.addAll(ALWAYS_MASKED_PARAMETERS);
-        this.maskedCookies = lowerCaseSet(obfuscate.getCookies());
         this.excludedPaths =
                 serverProperties.getExcludePaths().stream().map(Pattern::compile).toList();
         this.maxBodyBytes = Math.max(0, maxBodyBytes);
@@ -309,7 +245,6 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
         boolean includeBody = server.getLevel() == HttpLoggingLevel.FULL;
         if (includeHeaders) {
             common += " headers=" + headers(request, maskedHeaders);
-            common += " cookies=" + cookies(request, maskedCookies);
             common += " responseHeaders=" + responseHeaders(response, maskedHeaders);
         }
         String requestBody =
@@ -448,21 +383,6 @@ public final class ObservabilityMdcFilter extends OncePerRequestFilter {
                     headersToMask.contains(name.toLowerCase())
                             ? replacement
                             : String.join(", ", response.getHeaders(name)));
-        }
-        return values;
-    }
-
-    private Map<String, String> cookies(HttpServletRequest request, Set<String> cookiesToMask) {
-        if (request.getCookies() == null) {
-            return Map.of();
-        }
-        Map<String, String> values = new LinkedHashMap<>();
-        for (var cookie : request.getCookies()) {
-            values.put(
-                    cookie.getName(),
-                    cookiesToMask.contains(cookie.getName().toLowerCase())
-                            ? replacement
-                            : cookie.getValue());
         }
         return values;
     }

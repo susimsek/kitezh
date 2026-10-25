@@ -54,6 +54,8 @@ app:
   authorizationServer:
     issuer: https://kitezh.local
     offlineSessionIdle: P30D
+  mcp:
+    resourceAudience: https://kitezh-mcp.local/mcp
 
 existingSecret:
   enabled: false

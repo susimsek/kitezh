@@ -131,6 +131,61 @@ test("group metadata and attributes follow the real wire contract", () => {
   });
   for (const invalid of ["null", "[]", '{"a":"b"}', '{"a":[1]}', "{"])
     assert.throws(() => groupAttributes(invalid));
+
+  assert.deepEqual(groupPage(null), {
+    content: [],
+    size: 10,
+    number: 0,
+    totalElements: 0,
+    totalPages: 0,
+  });
+  assert.deepEqual(
+    groupPage(
+      {
+        content: "not-an-array",
+        page: {
+          size: 0,
+          number: 1.5,
+          totalElements: -1,
+          totalPages: Number.MAX_SAFE_INTEGER + 1,
+        },
+      },
+      20,
+    ),
+    {
+      content: [],
+      size: 20,
+      number: 0,
+      totalElements: 0,
+      totalPages: 0,
+    },
+  );
+  assert.deepEqual(groupPage({ content: [group], totalElements: 1 }), {
+    content: [group],
+    size: 10,
+    number: 0,
+    totalElements: 1,
+    totalPages: 1,
+  });
+});
+
+test("sparse group list records render safe defaults for optional metadata", async () => {
+  const sparseGroup = { id: 12, name: "Platform" };
+  const h = await harness({
+    response: (path, method) =>
+      path.startsWith("/api/admin/groups?") && method === "GET"
+        ? page([sparseGroup], { totalElements: 1, totalPages: 1 })
+        : undefined,
+  });
+  try {
+    await list(h);
+    const row = h.document.querySelector(".group-table tbody tr");
+    assert.equal(row.querySelector("td:first-child a").textContent, "Platform");
+    assert.equal(row.querySelector("td:nth-child(2)").textContent, "0");
+    assert.equal(row.querySelector("td:nth-child(3)").textContent, "0");
+  } finally {
+    h.restore();
+  }
 });
 
 test("group list renders counts, overflow actions, search, sorting, all pagination and size", async () => {
@@ -181,12 +236,65 @@ test("group list renders counts, overflow actions, search, sorting, all paginati
       h.calls.some(({ path }) => path.includes("q=Engineering&page=0&size=50")),
     );
     assert.equal(h.document.activeElement.id, "group-query");
+    query.value = "Parent";
+    emit(h, query);
+    emit(h, h.document.getElementById("group-search"), "submit");
+    await delay();
+    await settle();
+    assert.ok(
+      h.calls.some(({ path }) =>
+        path.includes("q=Parent&page=0&size=50"),
+      ),
+    );
+    const requestCount = h.calls.length;
+    query.value = "東京";
+    query.dispatchEvent(
+      new h.dom.window.InputEvent("input", {
+        bubbles: true,
+        isComposing: true,
+      }),
+    );
+    await delay();
+    assert.equal(h.calls.length, requestCount);
+    query.dispatchEvent(
+      new h.dom.window.CompositionEvent("compositionend", { bubbles: true }),
+    );
+    await delay();
+    assert.ok(
+      h.calls.some(({ path }) =>
+        new URL(path, "https://test.invalid").searchParams.has("q", "東京"),
+      ),
+    );
     await click(h, '[data-action="group-clear"]');
     assert.equal(h.document.getElementById("group-query").value, "");
     assert.equal(
       h.document.querySelector(".topbar p").textContent,
       "Manage user groups and role mappings.",
     );
+  } finally {
+    h.restore();
+  }
+});
+
+test("group navigation restores a user detail deep link from browser history", async () => {
+  const h = await harness();
+  h.setResponse("/api/admin/users/1", "GET", () => ({
+    id: 1,
+    username: "ada",
+    firstName: "Ada",
+    lastName: "Lovelace",
+    enabled: true,
+    emailVerified: true,
+    authorities: [],
+    attributes: {},
+  }));
+  try {
+    await list(h);
+    h.dom.window.history.pushState(null, "", "#/admin/users/1/details");
+    h.dom.window.dispatchEvent(new h.dom.window.PopStateEvent("popstate"));
+    await settle();
+    assert.ok(h.calls.some(({ path }) => path === "/api/admin/users/1"));
+    assert.ok(h.document.querySelector('[data-form="admin-user-detail-save"]'));
   } finally {
     h.restore();
   }
@@ -360,6 +468,90 @@ test("permissions add validates a blank row, save and remove sends complete assi
   }
 });
 
+test("group permission assignments reject duplicate user and permission pairs", async () => {
+  const h = await harness();
+  try {
+    await open(h, "permissions");
+    await click(h, '[data-action="group-permission-add"]');
+    await click(h, '[data-action="group-permission-add"]');
+    for (const index of [0, 1]) {
+      const user = h.document.getElementById(`group-permission-user-${index}`);
+      user.value = "1";
+      emit(h, user, "change");
+      const permission = h.document.getElementById(
+        `group-permission-value-${index}`,
+      );
+      permission.value = "MANAGE_GROUP";
+      emit(h, permission, "change");
+    }
+    const form = h.document.querySelector(
+      '[data-form="native-group-permissions"]',
+    );
+    emit(h, form, "submit");
+    await settle();
+    assert.match(
+      h.document.querySelectorAll(".group-permission-row .field-error")[1]
+        .textContent,
+      /must be unique/i,
+    );
+    assert.equal(
+      h.calls.some(
+        ({ path, method }) =>
+          path === "/api/admin/groups/3/permissions" && method === "PUT",
+      ),
+      false,
+    );
+
+    const secondPermission = h.document.getElementById(
+      "group-permission-value-1",
+    );
+    secondPermission.value = "MANAGE_ROLES";
+    emit(h, secondPermission, "change");
+    emit(h, form, "submit");
+    await settle();
+    assert.deepEqual(
+      h.calls.find(
+        ({ path, method }) =>
+          path === "/api/admin/groups/3/permissions" && method === "PUT",
+      ).body,
+      {
+        permissions: [
+          { userId: 1, permission: "MANAGE_GROUP" },
+          { userId: 1, permission: "MANAGE_ROLES" },
+        ],
+      },
+    );
+  } finally {
+    h.restore();
+  }
+});
+
+test("group permissions recover when the user directory is temporarily unavailable", async () => {
+  let unavailable = true;
+  const h = await harness({
+    response: (path) =>
+      path.startsWith("/api/admin/users?") && unavailable
+        ? { status: 503, kind: "server", body: null }
+        : undefined,
+  });
+  try {
+    await open(h, "permissions");
+    assert.ok(h.document.querySelector('[data-action="retry"]'));
+    assert.match(
+      h.document.querySelector(".content").textContent,
+      /operation could not be completed/i,
+    );
+    unavailable = false;
+    await click(h, '[data-action="retry"]');
+    assert.ok(
+      h.document.querySelector('[data-form="native-group-permissions"]'),
+    );
+    assert.ok(h.calls.some(({ path }) => path.startsWith("/api/admin/users?")));
+  } finally {
+    h.restore();
+  }
+});
+
 test("role mappings load sorted realm roles and save group response", async () => {
   const h = await harness();
   try {
@@ -483,6 +675,83 @@ test("members debounce autocomplete, add, remove, filter, sort, size and link to
       h.document.querySelector('[role="tab"][aria-selected="true"]')
         .textContent,
       "Members",
+    );
+  } finally {
+    h.restore();
+  }
+});
+
+test("group tabs and member suggestions support keyboard navigation", async () => {
+  const h = await harness();
+  try {
+    await open(h);
+    const detailsTab = h.document.querySelector(
+      '[data-action="group-tab"][data-id="details"]',
+    );
+    detailsTab.dispatchEvent(
+      new h.dom.window.KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await settle();
+    assert.equal(
+      h.document.querySelector('[role="tab"][aria-selected="true"]')
+        .textContent,
+      "Permissions",
+    );
+    for (const [key, expectedTab] of [
+      ["Home", "Settings"],
+      ["End", "Members"],
+      ["ArrowLeft", "Role mappings"],
+    ]) {
+      const activeTab = h.document.querySelector(
+        '[role="tab"][aria-selected="true"]',
+      );
+      activeTab.dispatchEvent(
+        new h.dom.window.KeyboardEvent("keydown", {
+          key,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await settle();
+      assert.equal(
+        h.document.querySelector('[role="tab"][aria-selected="true"]')
+          .textContent,
+        expectedTab,
+      );
+    }
+    await click(h, '[data-action="group-tab"][data-id="members"]');
+
+    const query = h.document.getElementById("group-candidate-query");
+    query.value = "gr";
+    emit(h, query);
+    await delay();
+    const activeQuery = h.document.getElementById("group-candidate-query");
+    const arrowDown = new h.dom.window.KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      bubbles: true,
+      cancelable: true,
+    });
+    activeQuery.dispatchEvent(arrowDown);
+    assert.equal(arrowDown.defaultPrevented, true);
+    assert.equal(
+      h.document.activeElement,
+      h.document.querySelector('#group-candidates [role="option"]'),
+    );
+
+    const escape = new h.dom.window.KeyboardEvent("keydown", {
+      key: "Escape",
+      bubbles: true,
+      cancelable: true,
+    });
+    activeQuery.dispatchEvent(escape);
+    await settle();
+    assert.equal(
+      h.document.querySelector('#group-candidates [role="option"]'),
+      null,
     );
   } finally {
     h.restore();
@@ -685,6 +954,26 @@ test("deep link hydrates active tab, locale and theme after reload", async () =>
     await settle();
     assert.equal(h.dom.window.location.hash, "#/admin/groups/3/roles");
     assert.equal(h.document.documentElement.dataset.theme, "dark");
+  } finally {
+    h.restore();
+  }
+});
+
+test("group member deep links clamp invalid pagination and restore the member sort", async () => {
+  const h = await harness({
+    hash: "#/admin/groups/3/members?page=1000001&size=25&sort=name,asc&q=ada",
+  });
+  try {
+    await settle();
+    assert.equal(h.document.getElementById("groupMember-size").value, "10");
+    assert.equal(h.document.getElementById("groupMember-sort").value, "username,asc");
+    assert.ok(
+      h.calls.some(
+        ({ path }) =>
+          path ===
+          "/api/admin/groups/3/users?q=ada&page=0&size=10&sort=username%2Casc",
+      ),
+    );
   } finally {
     h.restore();
   }

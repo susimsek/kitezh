@@ -1,0 +1,50 @@
+# Standalone MCP service for local development and self-hosted testing.
+# The Kitezh Authorization Server and Administration API must already be running.
+services:
+  mcp:
+    image: docker.io/suayb/kitezh-mcp:${MCP_IMAGE_TAG:-latest}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SERVER_PORT: 10000
+      MANAGEMENT_SERVER_PORT: 10001
+      OTEL_SERVICE_NAME: kitezh-mcp
+      APP_AUTHORIZATIONSERVER_ISSUER: ${APP_AUTHORIZATIONSERVER_ISSUER:-http://localhost:9090}
+      APP_SECURITY_JWK_SET_URI: ${APP_SECURITY_JWK_SET_URI:-http://host.docker.internal:9090/oauth2/jwks}
+      APP_SECURITY_AUDIENCE: ${APP_MCP_PUBLIC_URL:-http://localhost:10000/mcp}
+      APP_API_BASE_URL: ${APP_API_BASE_URL:-http://host.docker.internal:9090}
+      APP_MCP_PUBLIC_URL: ${APP_MCP_PUBLIC_URL:-http://localhost:10000/mcp}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-app://renderer,http://localhost:6274,http://127.0.0.1:6274}
+      APP_MCP_TOOLSETS: ${APP_MCP_TOOLSETS:-all}
+      APP_MCP_ADDITIONAL_TOOLS: ${APP_MCP_ADDITIONAL_TOOLS:-}
+      APP_MCP_TOOL_ALLOWLIST: ${APP_MCP_TOOL_ALLOWLIST:-*}
+      APP_LOG_FILE_ENABLED: ${APP_LOG_FILE_ENABLED:-false}
+      APP_LOG_FILE_PATH: ${APP_LOG_FILE_PATH:-logs/application.log}
+      APP_LOG_SYSLOG_ENABLED: ${APP_LOG_SYSLOG_ENABLED:-false}
+      APP_LOG_SYSLOG_HOST: ${APP_LOG_SYSLOG_HOST:-localhost}
+      APP_LOG_SYSLOG_PORT: ${APP_LOG_SYSLOG_PORT:-514}
+      APP_LOG_SYSLOG_FACILITY: ${APP_LOG_SYSLOG_FACILITY:-USER}
+      APP_LOG_SYSLOG_OUTPUT: ${APP_LOG_SYSLOG_OUTPUT:-default}
+      APP_LOG_SYSLOG_JSON_FORMAT: ${APP_LOG_SYSLOG_JSON_FORMAT:-default}
+      APP_LOG_ASYNC_ENABLED: ${APP_LOG_ASYNC_ENABLED:-true}
+      APP_LOG_ASYNC_QUEUE_SIZE: ${APP_LOG_ASYNC_QUEUE_SIZE:-512}
+      APP_LOG_ASYNC_NEVER_BLOCK: ${APP_LOG_ASYNC_NEVER_BLOCK:-false}
+      APP_LOG_MAX_BODY_BYTES: ${APP_LOG_MAX_BODY_BYTES:-8192}
+      APP_LOG_CLIENT_ENABLED: ${APP_LOG_CLIENT_ENABLED:-false}
+      APP_LOG_CLIENT_LEVEL: ${APP_LOG_CLIENT_LEVEL:-BASIC}
+      APP_LOG_CLIENT_EXCLUDE_PATHS: ${APP_LOG_CLIENT_EXCLUDE_PATHS:-}
+      APP_LOG_SERVER_ENABLED: ${APP_LOG_SERVER_ENABLED:-true}
+      APP_LOG_SERVER_LEVEL: ${APP_LOG_SERVER_LEVEL:-BASIC}
+      APP_LOG_SERVER_EXCLUDE_PATHS: ${APP_LOG_SERVER_EXCLUDE_PATHS:-/actuator/(health|metrics|prometheus)(/.*)?}
+      APP_LOG_SERVER_FILE_ENABLED: ${APP_LOG_SERVER_FILE_ENABLED:-false}
+      APP_LOG_SERVER_FILE_PATH: ${APP_LOG_SERVER_FILE_PATH:-logs/application-access.log}
+      APP_LOG_OBFUSCATE_REPLACEMENT: ${APP_LOG_OBFUSCATE_REPLACEMENT:-***}
+      APP_LOG_OBFUSCATE_HEADERS: ${APP_LOG_OBFUSCATE_HEADERS:-Authorization,Cookie,Set-Cookie,Proxy-Authorization,DPoP,X-Api-Key}
+      APP_LOG_OBFUSCATE_BODY_FIELDS: ${APP_LOG_OBFUSCATE_BODY_FIELDS:-access_token,refresh_token,id_token,client_secret,password,authorization,cookie,token,secret,api_key,assertion,private_key,code,code_verifier,captchaToken,response,siteKey,apiKey,auth_req_id,client_notification_token,id_token_hint,login_hint_token,user_code,dpop,dpop_proof,jwk}
+      APP_LOG_OBFUSCATE_PARAMETERS: ${APP_LOG_OBFUSCATE_PARAMETERS:-access_token,refresh_token,id_token,client_secret,client_assertion,password,authorization,token,secret,api_key,assertion,code,code_verifier,state,nonce,request,request_uri,id_token_hint,auth_req_id,client_notification_token,login_hint_token,user_code,captchaToken,response,key}
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:-default}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "127.0.0.1:10000:10000"
+      - "127.0.0.1:10001:10001"
+    restart: unless-stopped

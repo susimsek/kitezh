@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+	<changeSet id="036-create-personal-access-tokens" author="kitezh">
+		<createTable tableName="personal_access_tokens">
+			<column name="id" type="varchar(36)">
+				<constraints primaryKey="true" nullable="false" primaryKeyName="pk_personal_access_tokens"/>
+			</column>
+			<column name="user_id" type="bigint">
+				<constraints nullable="false" foreignKeyName="fk_personal_access_tokens_user" references="users(id)" deleteCascade="true"/>
+			</column>
+			<column name="authorization_id" type="varchar(100)">
+				<constraints nullable="false" unique="true" uniqueConstraintName="uk_personal_access_tokens_authorization" foreignKeyName="fk_personal_access_tokens_authorization" references="oauth2_authorization(id)" deleteCascade="true"/>
+			</column>
+			<column name="seed_key" type="varchar(100)"/>
+			<column name="name" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="description" type="varchar(500)"/>
+			<column name="created_at" type="timestamp">
+				<constraints nullable="false"/>
+			</column>
+			<column name="expires_at" type="timestamp">
+				<constraints nullable="true"/>
+			</column>
+		</createTable>
+		<createIndex tableName="personal_access_tokens" indexName="idx_personal_access_tokens_user_created">
+			<column name="user_id"/>
+			<column name="created_at" descending="true"/>
+		</createIndex>
+		<createIndex tableName="personal_access_tokens" indexName="idx_personal_access_tokens_expiry">
+			<column name="expires_at"/>
+		</createIndex>
+	</changeSet>
+
+	<changeSet id="037-seed-demo-personal-access-tokens" author="kitezh">
+		<createTable tableName="personal_access_token_seeds">
+			<column name="seed_key" type="varchar(100)">
+				<constraints primaryKey="true" nullable="false" primaryKeyName="pk_personal_access_token_seeds"/>
+			</column>
+			<column name="username" type="varchar(100)">
+				<constraints nullable="false" foreignKeyName="fk_personal_access_token_seeds_user" references="users(username)" deleteCascade="true"/>
+			</column>
+			<column name="name" type="varchar(100)">
+				<constraints nullable="false"/>
+			</column>
+			<column name="description" type="varchar(500)"/>
+			<column name="expiration" type="varchar(20)">
+				<constraints nullable="false"/>
+			</column>
+		</createTable>
+		<loadData encoding="UTF-8" file="db/data/personal-access-token-seeds.csv" separator=";" tableName="personal_access_token_seeds" usePreparedStatements="true">
+			<column header="seed_key" type="string"/>
+			<column header="username" type="string"/>
+			<column header="name" type="string"/>
+			<column header="description" type="string"/>
+			<column header="expiration" type="string"/>
+		</loadData>
+	</changeSet>
+</databaseChangeLog>

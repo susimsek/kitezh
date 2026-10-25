@@ -71,6 +71,60 @@ test("native Account renderer covers navigation, settings, and session states", 
   }
 });
 
+test("native Account renderer localizes each settings and security route", async () => {
+  const harness = await renderConsole("account", { locale: "tr" });
+  try {
+    const { document } = harness;
+    const routes = [
+      "security",
+      "sessions",
+      "applications",
+      "notifications",
+      "settings",
+      "profile",
+    ];
+    for (const route of routes) {
+      const link = document.querySelector(`[data-route="${route}"]`);
+      assert.ok(link, `Turkish Account navigation should include ${route}`);
+      link.click();
+      await settle();
+      assert.equal(
+        document.querySelector(`[data-route="${route}"]`).getAttribute("aria-current"),
+        "page",
+      );
+      await exerciseVisibleEditorActions(document);
+    }
+    assert.ok(document.querySelector('[data-form="profile"]'));
+  } finally {
+    harness.restore();
+  }
+});
+
+test("native Account lists show accessible empty states", async () => {
+  const emptyPage = { content: [], totalElements: 0, totalPages: 0, number: 0 };
+  const harness = await renderConsole("account", {
+    response: async (path) =>
+      path.startsWith("/api/account/sessions?") ||
+      path.startsWith("/api/account/applications?") ||
+      path.startsWith("/api/account/notifications?")
+        ? emptyPage
+        : null,
+  });
+  try {
+    const { document } = harness;
+    for (const route of ["sessions", "applications", "notifications"]) {
+      document.querySelector(`[data-route="${route}"]`).click();
+      await settle();
+      assert.ok(
+        document.querySelector(".content .empty"),
+        `${route} should expose an empty-state status`,
+      );
+    }
+  } finally {
+    harness.restore();
+  }
+});
+
 test("native renderer script remains a module with a narrow desktop bridge", async () => {
   const source = await readFile(rendererPath, "utf8");
   assert.match(source, /globalThis\.desktopApi/);
@@ -928,6 +982,64 @@ test("native sign-in keeps pending state, cancels login, and reports startup fai
     );
   } finally {
     harness.restore();
+  }
+});
+
+test("native hydration handles session lookup and admin identity failures", async () => {
+  const account = await renderConsole("account", { hasSessionFailure: true });
+  try {
+    await settle();
+    assert.ok(account.document.querySelector('[data-action="sign-in"]'));
+    assert.equal(
+      account.calls.filter(({ path }) => path.startsWith("/api/")).length,
+      0,
+    );
+    account.document
+      .querySelector('[data-action="cancel-sign-in"]')
+      .click();
+    await settle();
+  } finally {
+    account.restore();
+  }
+
+  const admin = await renderConsole("admin", {
+    response: async (path) =>
+      path === "/api/admin/whoami" ? { status: 403, body: {} } : undefined,
+  });
+  try {
+    await settle();
+    assert.ok(admin.document.querySelector('[role="alert"]'));
+    assert.ok(admin.calls.some(({ path }) => path === "/api/admin/whoami"));
+  } finally {
+    admin.restore();
+  }
+
+  const invalidIdentity = await renderConsole("admin", {
+    response: async (path) =>
+      path === "/api/admin/whoami" ? { access: {} } : undefined,
+  });
+  try {
+    await settle();
+    assert.ok(
+      invalidIdentity.calls.some(({ path }) => path === "/api/admin/whoami"),
+    );
+    assert.ok(invalidIdentity.document.querySelector(".sidebar"));
+  } finally {
+    invalidIdentity.restore();
+  }
+
+  const recovered = await renderConsole("admin", { sessionConsole: "account" });
+  try {
+    await settle();
+    assert.ok(
+      recovered.calls.some(({ path }) => path === "/api/account/profile"),
+    );
+    assert.equal(
+      recovered.calls.some(({ path }) => path.startsWith("/api/admin/")),
+      false,
+    );
+  } finally {
+    recovered.restore();
   }
 });
 

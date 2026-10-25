@@ -1,22 +1,34 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Linking } from "react-native";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@/testing/native-testing-library";
+import * as ExpoLinking from "expo-linking";
+import {
+  AppState,
+  Linking,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import type { ReactNode } from "react";
 import * as storage from "../auth/storage";
 import { MobileAuthProvider, useMobileAuth } from "../auth/MobileAuthProvider";
 
 jest.mock("expo-auth-session", () => {
-  let authDiscovery: unknown = {
-    authorizationEndpoint: "https://issuer.example.test/authorize",
-    discoveryDocument: { issuer: "https://issuer.example.test" },
-    endSessionEndpoint: "https://issuer.example.test/logout",
-    tokenEndpoint: "https://issuer.example.test/token",
-  };
   const promptAsync = jest.fn();
   const exchangeCode = jest.fn();
   const refresh = jest.fn();
+  const authorizationEndpoints: string[] = [];
   let requestSequence = 0;
+  let requestHasCodeVerifier = true;
   class MockAuthRequest {
     codeVerifier: string | null = null;
+    codeChallenge: string | null = null;
     redirectUri: string;
     state: string;
 
@@ -26,9 +38,22 @@ jest.mock("expo-auth-session", () => {
       this.state = `test-state-${requestSequence}`;
     }
 
-    async makeAuthUrlAsync() {
-      this.codeVerifier = `test-verifier-${requestSequence}`;
+    async makeAuthUrlAsync(discovery?: { authorizationEndpoint: string }) {
+      if (discovery?.authorizationEndpoint) {
+        authorizationEndpoints.push(discovery.authorizationEndpoint);
+      }
+      this.codeChallenge = `test-challenge-${requestSequence}`;
+      this.codeVerifier = requestHasCodeVerifier
+        ? `test-verifier-${requestSequence}`
+        : null;
       return "https://issuer.example.test/authorize";
+    }
+
+    parseReturnUrl(url: string) {
+      return {
+        type: "success",
+        params: Object.fromEntries(new URL(url).searchParams.entries()),
+      };
     }
 
     async promptAsync() {
@@ -44,21 +69,76 @@ jest.mock("expo-auth-session", () => {
   }
   return {
     AuthRequest: MockAuthRequest,
+    __authorizationEndpoints: authorizationEndpoints,
     __exchangeCode: exchangeCode,
     __promptAsync: promptAsync,
     __refresh: refresh,
+    __setRequestHasCodeVerifier: (hasCodeVerifier: boolean) => {
+      requestHasCodeVerifier = hasCodeVerifier;
+    },
+    __resetRequestSequence: () => {
+      requestSequence = 0;
+    },
     __setDiscovery: (discovery: unknown) => {
       authDiscovery = discovery;
     },
     exchangeCodeAsync: exchangeCode,
-    makeRedirectUri: () => "kitezh://account/oauth/callback",
+    makeRedirectUri: () => "kitezh://oauth/callback",
     refreshAsync: refresh,
-    useAutoDiscovery: () => authDiscovery,
+  };
+});
+jest.mock("../auth/discovery", () => {
+  class MockNativeDiscoveryError extends Error {
+    kind: string;
+
+    constructor(kind: string) {
+      super(kind);
+      this.kind = kind;
+    }
+  }
+  return {
+    fetchNativeAuthorizationDiscovery: jest.fn(async () => ({
+      authorizationEndpoint: "https://issuer.example.test/authorize",
+      discoveryDocument: { issuer: "https://issuer.example.test" },
+      endSessionEndpoint: "https://issuer.example.test/logout",
+      tokenEndpoint: "https://issuer.example.test/token",
+    })),
+    NativeDiscoveryError: MockNativeDiscoveryError,
   };
 });
 jest.mock("expo-web-browser", () => ({
   maybeCompleteAuthSession: jest.fn(),
+  dismissBrowser: jest.fn(async () => undefined),
   openAuthSessionAsync: jest.fn(async () => ({ type: "success" })),
+  openBrowserAsync: jest.fn(async () => ({ type: "opened" })),
+}));
+jest.mock("@react-native-google-signin/google-signin", () => ({
+  GoogleSignin: {
+    configure: jest.fn(),
+    hasPlayServices: jest.fn(async () => true),
+    signIn: jest.fn(async () => ({
+      type: "success",
+      data: { idToken: "signed-google-id-token" },
+    })),
+  },
+  isSuccessResponse: (response: { type: string }) =>
+    response.type === "success",
+}));
+jest.mock("../auth/native-social-login", () => ({
+  isNativeSocialProviderConfigured: jest.fn(() => true),
+  requestNativeGoogleIdToken: jest.fn(async () => "signed-google-id-token"),
+}));
+jest.mock("@/api/public-api", () => ({
+  startMobileLogin: jest.fn(),
+  startMobileGoogleLogin: jest.fn(),
+  startMobilePasskeyLogin: jest.fn(),
+  submitMobileLoginAction: jest.fn(),
+  submitMobileLoginConsent: jest.fn(),
+  submitMobileLoginMfa: jest.fn(),
+  verifyMobilePasskeyLogin: jest.fn(),
+}));
+jest.mock("@/auth/native-passkey", () => ({
+  getNativePasskey: jest.fn(),
 }));
 jest.mock("expo-linking", () => ({
   parse: (url: string) => ({
@@ -70,8 +150,8 @@ jest.mock("@/config", () => ({
   getMobileConsoleConfig: () => ({
     clientId: "mobile-account",
     namespace: "account",
-    postLogoutRedirectUri: "kitezh://account/logout/callback",
-    redirectUri: "kitezh://account/oauth/callback",
+    postLogoutRedirectUri: "kitezh://logout/callback",
+    redirectUri: "kitezh://oauth/callback",
     scopes: ["openid", "account-api"],
   }),
 }));
@@ -83,11 +163,23 @@ jest.mock("@/i18n/LocaleProvider", () => ({
 }));
 jest.mock("../auth/storage", () => ({
   clearSession: jest.fn(),
+  clearSessionIfCurrent: jest.fn(async (namespace: string) => {
+    await jest.requireMock("../auth/storage").clearSession(namespace);
+    return true;
+  }),
   clearOAuthTransaction: jest.fn(),
   consumeOAuthTransaction: jest.fn(),
   readSession: jest.fn(),
   saveOAuthTransaction: jest.fn(),
   writeSession: jest.fn(),
+  writeSessionIfCurrent: jest.fn(
+    async (session: unknown, namespace: string) => {
+      await jest
+        .requireMock("../auth/storage")
+        .writeSession(session, namespace);
+      return true;
+    },
+  ),
 }));
 
 let savedOAuthTransaction: Awaited<
@@ -95,23 +187,116 @@ let savedOAuthTransaction: Awaited<
 > = null;
 
 const {
+  __authorizationEndpoints: mockAuthorizationEndpoints,
   __exchangeCode: mockExchangeCode,
   __promptAsync: mockPromptAsync,
   __refresh: mockRefresh,
+  __setRequestHasCodeVerifier: mockSetRequestHasCodeVerifier,
   __setDiscovery: mockSetDiscovery,
 } = jest.requireMock("expo-auth-session");
+const { fetchNativeAuthorizationDiscovery: mockFetchDiscovery } =
+  jest.requireMock("../auth/discovery");
+const { isNativeSocialProviderConfigured: mockNativeSocialConfigured } =
+  jest.requireMock("../auth/native-social-login");
+const {
+  startMobileLogin: mockStartMobileLogin,
+  startMobileGoogleLogin: mockStartMobileGoogleLogin,
+  submitMobileLoginAction: mockSubmitMobileLoginAction,
+  submitMobileLoginConsent: mockSubmitMobileLoginConsent,
+  submitMobileLoginMfa: mockSubmitMobileLoginMfa,
+  startMobilePasskeyLogin: mockStartMobilePasskeyLogin,
+  verifyMobilePasskeyLogin: mockVerifyMobilePasskeyLogin,
+} = jest.requireMock("@/api/public-api");
+const { getNativePasskey: mockGetNativePasskey } = jest.requireMock(
+  "@/auth/native-passkey",
+);
 
 function AuthProbe() {
   const auth = useMobileAuth();
   return (
-    <div>
-      <output>{auth.status}</output>
-      <output>{auth.error ?? "no-error"}</output>
-      <output>{auth.session?.accessToken ?? "no-session"}</output>
-      <button onClick={() => void auth.signIn()}>sign-in</button>
-      <button onClick={() => void auth.refreshSession(true)}>refresh</button>
-      <button onClick={() => void auth.signOut()}>sign-out</button>
-    </div>
+    <View>
+      <Text>{auth.status}</Text>
+      <Text>{auth.error ?? "no-error"}</Text>
+      <Text>{auth.session?.accessToken ?? "no-session"}</Text>
+      <Text>{auth.loginChallenge?.kind ?? "no-login-challenge"}</Text>
+      <Pressable accessibilityRole="button" onPress={() => void auth.signIn()}>
+        <Text>sign-in</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.signIn("google-alias")}
+      >
+        <Text>provider-sign-in</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.signIn("google")}
+      >
+        <Text>native-google-sign-in</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.nativeLogin("alice", "secret")}
+      >
+        <Text>native-sign-in</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.nativePasskeyLogin("alice")}
+      >
+        <Text>native-passkey-sign-in</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.cancelNativeLogin()}
+      >
+        <Text>cancel-native-login</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.submitLoginMfa("123456")}
+      >
+        <Text>submit-login-mfa</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.submitLoginConsent(true)}
+      >
+        <Text>approve-login-consent</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.submitLoginConsent(false)}
+      >
+        <Text>deny-login-consent</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() =>
+          void auth.submitLoginAction({ newPassword: "a-long-password" })
+        }
+      >
+        <Text>submit-login-action</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => void auth.refreshSession(true)}
+      >
+        <Text>refresh</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          void auth.refreshSession(true);
+          void auth.refreshSession(true);
+        }}
+      >
+        <Text>refresh-twice</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void auth.signOut()}>
+        <Text>sign-out</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -130,12 +315,39 @@ function deferred<T>() {
 }
 
 beforeEach(() => {
+  jest.restoreAllMocks();
   jest.clearAllMocks();
+  Object.defineProperty(Platform, "OS", { configurable: true, value: "ios" });
+  jest.requireMock("expo-auth-session").__resetRequestSequence();
   mockSetDiscovery({
     authorizationEndpoint: "https://issuer.example.test/authorize",
     discoveryDocument: { issuer: "https://issuer.example.test" },
     endSessionEndpoint: "https://issuer.example.test/logout",
     tokenEndpoint: "https://issuer.example.test/token",
+  });
+  mockSetRequestHasCodeVerifier(true);
+  mockStartMobileLogin.mockResolvedValue({
+    status: "authorized",
+    code: "authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
+  });
+  mockStartMobilePasskeyLogin.mockResolvedValue({
+    status: "passkey_required",
+    transactionId: "passkey-transaction",
+    publicKey: { challenge: "public-key-challenge" },
+  });
+  mockGetNativePasskey.mockResolvedValue({
+    id: "credential-id",
+    rawId: "raw-credential-id",
+    response: { clientDataJSON: "client-data" },
+    type: "public-key",
+  });
+  mockVerifyMobilePasskeyLogin.mockResolvedValue({
+    status: "authorized",
+    code: "authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
   });
   jest.mocked(storage.readSession).mockResolvedValue(null);
   jest.mocked(storage.writeSession).mockResolvedValue(undefined);
@@ -145,7 +357,7 @@ beforeEach(() => {
     clientId: "mobile-account",
     codeVerifier: "test-verifier",
     createdAt: Date.now(),
-    redirectUri: "kitezh://account/oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
     state: "test-state",
   });
   jest.mocked(storage.saveOAuthTransaction).mockResolvedValue(undefined);
@@ -186,8 +398,8 @@ it("restores an account session, exchanges PKCE, refreshes, and clears on logout
     expiresAt: Date.now() - 1,
   });
   renderProvider();
-  expect(await screen.findByText("signed-in")).toBeVisible();
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   await waitFor(() =>
     expect(storage.writeSession).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -203,13 +415,13 @@ it("restores an account session, exchanges PKCE, refreshes, and clears on logout
     expect.objectContaining({
       clientId: "mobile-account",
       codeVerifier: expect.stringMatching(/^test-verifier-\d+$/),
-      redirectUri: "kitezh://account/oauth/callback",
+      redirectUri: "kitezh://oauth/callback",
       state: expect.stringMatching(/^test-state-\d+$/),
     }),
   );
   expect(storage.consumeOAuthTransaction).toHaveBeenCalledWith("account", {
     clientId: "mobile-account",
-    redirectUri: "kitezh://account/oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
   });
   expect(mockExchangeCode).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -220,7 +432,7 @@ it("restores an account session, exchanges PKCE, refreshes, and clears on logout
     expect.any(Object),
   );
 
-  fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
   await waitFor(() =>
     expect(storage.writeSession).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -230,45 +442,525 @@ it("restores an account session, exchanges PKCE, refreshes, and clears on logout
       "account",
     ),
   );
-  fireEvent.click(screen.getByRole("button", { name: "sign-out" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-out" }));
   await waitFor(() =>
     expect(storage.clearSession).toHaveBeenCalledWith("account"),
   );
-  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(await screen.findByText("signed-out")).toBeTruthy();
+});
+
+it("supports access-only tokens without refresh or end-session data", async () => {
+  mockExchangeCode.mockResolvedValueOnce({
+    accessToken: "access-only-token",
+    expiresIn: 300,
+    issuedAt: Math.floor(Date.now() / 1000),
+  });
+
+  renderProvider();
+  await screen.findByText("signed-out");
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  await waitFor(() =>
+    expect(storage.writeSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessToken: "access-only-token",
+        refreshToken: null,
+        idToken: null,
+      }),
+      "account",
+    ),
+  );
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
+  expect(mockRefresh).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByRole("button", { name: "sign-out" }));
+  expect(await screen.findByText("signed-out")).toBeTruthy();
+  expect(WebBrowser.openAuthSessionAsync).not.toHaveBeenCalled();
 });
 
 it("keeps a cancelled authorization signed out and reports unavailable discovery", async () => {
   mockPromptAsync.mockResolvedValueOnce({ type: "cancel" });
   renderProvider();
   await screen.findByText("signed-out");
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   await waitFor(() => expect(mockPromptAsync).toHaveBeenCalledTimes(1));
-  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(await screen.findByText("signed-out")).toBeTruthy();
   expect(storage.writeSession).not.toHaveBeenCalled();
 });
 
+it("rejects an authorization request without a PKCE verifier", async () => {
+  mockSetRequestHasCodeVerifier(false);
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
+  expect(storage.saveOAuthTransaction).not.toHaveBeenCalled();
+  expect(mockPromptAsync).not.toHaveBeenCalled();
+});
+
+it("reports a provider authorization error without exchanging a code", async () => {
+  mockPromptAsync.mockResolvedValueOnce({
+    type: "error",
+    params: { error: "access_denied" },
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("authorization-cancelled")).toBeTruthy();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+});
+
+it("clears the pending transaction when the browser dismisses authorization", async () => {
+  mockPromptAsync.mockResolvedValueOnce({ type: "dismiss" });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("signed-out")).toBeTruthy();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+});
+
 it("refuses an authorization endpoint from mismatched discovery metadata", async () => {
-  mockSetDiscovery({
+  jest.mocked(mockFetchDiscovery).mockResolvedValueOnce({
     authorizationEndpoint: "https://attacker.example.test/authorize",
     discoveryDocument: { issuer: "https://issuer.example.test" },
     tokenEndpoint: "https://issuer.example.test/token",
   });
   renderProvider();
   await screen.findByText("signed-out");
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
-  expect(await screen.findByText("error")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+  expect(await screen.findByText("error")).toBeTruthy();
   expect(mockPromptAsync).not.toHaveBeenCalled();
   expect(storage.saveOAuthTransaction).not.toHaveBeenCalled();
+});
+
+it("reports unavailable discovery without starting an authorization request", async () => {
+  mockFetchDiscovery.mockRejectedValueOnce(new Error("discovery unavailable"));
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("Authentication failed")).toBeTruthy();
+  expect(mockPromptAsync).not.toHaveBeenCalled();
+  expect(storage.saveOAuthTransaction).not.toHaveBeenCalled();
+});
+
+it("times out a browser authorization that never returns", async () => {
+  jest.useFakeTimers();
+  mockPromptAsync.mockReturnValueOnce(new Promise(() => {}));
+  try {
+    renderProvider();
+    await screen.findByText("signed-out");
+
+    fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+    await waitFor(() => expect(mockPromptAsync).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5 * 60_000);
+    });
+
+    expect(screen.getByText("authorization-timeout")).toBeTruthy();
+    expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it("completes Android authorization from the native redirect event", async () => {
+  Object.defineProperty(Platform, "OS", {
+    configurable: true,
+    value: "android",
+  });
+  let receiveUrl: ((event: { url: string }) => void) | undefined;
+  const removeUrlListener = jest.fn();
+  const removeAppStateListener = jest.fn();
+  jest.spyOn(Linking, "addEventListener").mockImplementation(((
+    event: string,
+    listener: (event: never) => void,
+  ) => {
+    if (event === "url") {
+      receiveUrl = listener as (event: { url: string }) => void;
+      return { remove: removeUrlListener };
+    }
+    return { remove: jest.fn() };
+  }) as never);
+  jest.spyOn(AppState, "addEventListener").mockImplementation((() => ({
+    remove: removeAppStateListener,
+  })) as never);
+
+  renderProvider();
+  await screen.findByText("signed-out");
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+  await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalled());
+  const state = savedOAuthTransaction?.state;
+  expect(state).toBeDefined();
+
+  act(() => {
+    receiveUrl?.({
+      url: `kitezh://oauth/callback?code=android-code&state=${state}`,
+    });
+  });
+
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+  expect(mockExchangeCode).toHaveBeenCalledWith(
+    expect.objectContaining({ code: "android-code" }),
+    expect.any(Object),
+  );
+  expect(removeUrlListener).toHaveBeenCalled();
+  expect(removeAppStateListener).toHaveBeenCalled();
+});
+
+it("does not cancel Android authorization for an active state without a background transition", async () => {
+  Object.defineProperty(Platform, "OS", {
+    configurable: true,
+    value: "android",
+  });
+  let receiveUrl: ((event: { url: string }) => void) | undefined;
+  let changeAppState: ((state: string) => void) | undefined;
+  jest.spyOn(Linking, "addEventListener").mockImplementation(((
+    event,
+    listener,
+  ) => {
+    if (event === "url") {
+      receiveUrl = listener as (event: { url: string }) => void;
+    }
+    return { remove: jest.fn() };
+  }) as never);
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _event,
+    listener,
+  ) => {
+    changeAppState = listener as (state: string) => void;
+    return { remove: jest.fn() };
+  }) as never);
+
+  renderProvider();
+  await screen.findByText("signed-out");
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+  await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalled());
+  const state = savedOAuthTransaction?.state;
+  expect(state).toBeDefined();
+
+  act(() => changeAppState?.("active"));
+  await act(async () => Promise.resolve());
+  expect(screen.getByText("signing-in")).toBeTruthy();
+  act(() => {
+    receiveUrl?.({
+      url: `kitezh://oauth/callback?code=android-code&state=${state}`,
+    });
+  });
+
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+  expect(mockExchangeCode).toHaveBeenCalledWith(
+    expect.objectContaining({ code: "android-code" }),
+    expect.any(Object),
+  );
+});
+
+it("times out an Android browser session and removes native listeners", async () => {
+  Object.defineProperty(Platform, "OS", {
+    configurable: true,
+    value: "android",
+  });
+  const removeUrlListener = jest.fn();
+  const removeAppStateListener = jest.fn();
+  jest.spyOn(Linking, "addEventListener").mockImplementation((() => ({
+    remove: removeUrlListener,
+  })) as never);
+  jest.spyOn(AppState, "addEventListener").mockImplementation((() => ({
+    remove: removeAppStateListener,
+  })) as never);
+
+  renderProvider();
+  await screen.findByText("signed-out");
+  jest.useFakeTimers();
+  try {
+    await act(async () => {
+      fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(WebBrowser.openBrowserAsync).toHaveBeenCalled();
+
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(5 * 60_000);
+    });
+
+    expect(await screen.findByText("authorization-timeout")).toBeTruthy();
+    expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+    expect(removeUrlListener).toHaveBeenCalled();
+    expect(removeAppStateListener).toHaveBeenCalled();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it("cancels Android authorization when the browser returns without a callback", async () => {
+  Object.defineProperty(Platform, "OS", {
+    configurable: true,
+    value: "android",
+  });
+  let receiveUrl: ((event: { url: string }) => void) | undefined;
+  let changeAppState: ((state: string) => void) | undefined;
+  jest.spyOn(Linking, "addEventListener").mockImplementation(((
+    event: string,
+    listener: (event: never) => void,
+  ) => {
+    if (event === "url") {
+      receiveUrl = listener as (event: { url: string }) => void;
+    }
+    return { remove: jest.fn() };
+  }) as never);
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _event,
+    listener,
+  ) => {
+    changeAppState = listener as (state: string) => void;
+    return { remove: jest.fn() };
+  }) as never);
+
+  renderProvider();
+  await screen.findByText("signed-out");
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+  await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalled());
+
+  jest.useFakeTimers();
+  act(() => {
+    receiveUrl?.({ url: "https://untrusted.example.test/callback?code=bad" });
+    changeAppState?.("background");
+    changeAppState?.("active");
+  });
+  try {
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(750);
+    });
+    expect(await screen.findByText("signed-out")).toBeTruthy();
+    expect(mockExchangeCode).not.toHaveBeenCalled();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it("stays signed out when Android immediately cancels browser launch", async () => {
+  Object.defineProperty(Platform, "OS", {
+    configurable: true,
+    value: "android",
+  });
+  const removeUrlListener = jest.fn();
+  const removeAppStateListener = jest.fn();
+  jest.spyOn(Linking, "addEventListener").mockImplementation((() => ({
+    remove: removeUrlListener,
+  })) as never);
+  jest.spyOn(AppState, "addEventListener").mockImplementation((() => ({
+    remove: removeAppStateListener,
+  })) as never);
+  jest
+    .mocked(WebBrowser.openBrowserAsync)
+    .mockResolvedValueOnce({ type: "cancel" } as never);
+
+  renderProvider();
+  await screen.findByText("signed-out");
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("signed-out")).toBeTruthy();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  expect(removeUrlListener).toHaveBeenCalled();
+  expect(removeAppStateListener).toHaveBeenCalled();
+});
+
+it("cleans up Android authorization listeners when browser launch fails", async () => {
+  Object.defineProperty(Platform, "OS", {
+    configurable: true,
+    value: "android",
+  });
+  const removeUrlListener = jest.fn();
+  const removeAppStateListener = jest.fn();
+  jest.spyOn(Linking, "addEventListener").mockImplementation((() => ({
+    remove: removeUrlListener,
+  })) as never);
+  jest.spyOn(AppState, "addEventListener").mockImplementation((() => ({
+    remove: removeAppStateListener,
+  })) as never);
+  jest
+    .mocked(WebBrowser.openBrowserAsync)
+    .mockRejectedValueOnce(new Error("system browser unavailable"));
+
+  renderProvider();
+  await screen.findByText("signed-out");
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  expect(removeUrlListener).toHaveBeenCalled();
+  expect(removeAppStateListener).toHaveBeenCalled();
+});
+
+it("fails authorization when its PKCE transaction has expired", async () => {
+  jest.mocked(storage.consumeOAuthTransaction).mockResolvedValueOnce(null);
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+});
+
+it("rejects an authorization callback whose state differs from the saved transaction", async () => {
+  jest.mocked(storage.consumeOAuthTransaction).mockResolvedValueOnce({
+    clientId: "mobile-account",
+    codeVerifier: "test-verifier",
+    createdAt: Date.now(),
+    redirectUri: "kitezh://oauth/callback",
+    state: "another-request-state",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
+
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+});
+
+it("continues signed out when secure session restoration fails", async () => {
+  jest
+    .mocked(storage.readSession)
+    .mockRejectedValueOnce(new Error("secure storage unavailable"));
+
+  renderProvider();
+
+  expect(await screen.findByText("signed-out")).toBeTruthy();
+  expect(storage.clearSession).not.toHaveBeenCalled();
+});
+
+it("reports a cold-start callback lookup failure", async () => {
+  jest
+    .spyOn(Linking, "getInitialURL")
+    .mockRejectedValueOnce(new Error("initial URL unavailable"));
+
+  renderProvider();
+
+  expect(await screen.findByText("Authentication failed")).toBeTruthy();
+  expect(screen.getByText("error")).toBeTruthy();
+});
+
+it("keeps the restored session when it has no refresh token", async () => {
+  jest.mocked(storage.readSession).mockResolvedValue({
+    accessToken: "stored-access-token",
+    refreshToken: null,
+    idToken: "stored-id-token",
+    expiresAt: 0,
+  });
+
+  renderProvider();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
+
+  await waitFor(() => expect(mockRefresh).not.toHaveBeenCalled());
+  expect(screen.getByText("stored-access-token")).toBeTruthy();
+});
+
+it("retains stored refresh and ID tokens when refresh omits rotated values", async () => {
+  jest.mocked(storage.readSession).mockResolvedValue({
+    accessToken: "expired-access-token",
+    refreshToken: "stored-refresh-token",
+    idToken: "stored-id-token",
+    expiresAt: 0,
+  });
+  mockRefresh.mockResolvedValueOnce({
+    accessToken: "refreshed-access-token",
+    refreshToken: undefined,
+    idToken: undefined,
+    expiresIn: 300,
+    issuedAt: Math.floor(Date.now() / 1000),
+  });
+
+  renderProvider();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
+
+  await waitFor(() =>
+    expect(storage.writeSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessToken: "refreshed-access-token",
+        refreshToken: "stored-refresh-token",
+        idToken: "stored-id-token",
+      }),
+      "account",
+    ),
+  );
+});
+
+it("refreshes an expired session when the app becomes active", async () => {
+  let changeAppState: ((state: string) => void) | undefined;
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _event,
+    listener,
+  ) => {
+    changeAppState = listener as (state: string) => void;
+    return { remove: jest.fn() };
+  }) as never);
+  jest.mocked(storage.readSession).mockResolvedValue({
+    accessToken: "expired-access-token",
+    refreshToken: "stored-refresh-token",
+    idToken: "stored-id-token",
+    expiresAt: 0,
+  });
+
+  renderProvider();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+
+  act(() => changeAppState?.("active"));
+
+  await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+});
+
+it("keeps a fresh session without refreshing when the app becomes active", async () => {
+  let changeAppState: ((state: string) => void) | undefined;
+  jest.spyOn(AppState, "addEventListener").mockImplementation(((
+    _event,
+    listener,
+  ) => {
+    changeAppState = listener as (state: string) => void;
+    return { remove: jest.fn() };
+  }) as never);
+  jest.mocked(storage.readSession).mockResolvedValue({
+    accessToken: "fresh-access-token",
+    refreshToken: "stored-refresh-token",
+    idToken: "stored-id-token",
+    expiresAt: Date.now() + 60 * 60_000,
+  });
+
+  renderProvider();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+
+  act(() => changeAppState?.("active"));
+
+  expect(mockRefresh).not.toHaveBeenCalled();
+  expect(screen.getByText("fresh-access-token")).toBeTruthy();
 });
 
 it("creates a fresh OAuth state for every sign-in attempt", async () => {
   renderProvider();
   await screen.findByText("signed-out");
 
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
 
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(2));
   expect(storage.saveOAuthTransaction).toHaveBeenCalledTimes(2);
   const firstState = jest.mocked(storage.saveOAuthTransaction).mock
@@ -290,8 +982,8 @@ it("ignores repeated sign-in taps while the browser request is pending", async (
   await screen.findByText("signed-out");
   const signIn = screen.getByRole("button", { name: "sign-in" });
 
-  fireEvent.click(signIn);
-  fireEvent.click(signIn);
+  fireEvent.press(signIn);
+  fireEvent.press(signIn);
 
   await waitFor(() => expect(mockPromptAsync).toHaveBeenCalledTimes(1));
   expect(storage.saveOAuthTransaction).toHaveBeenCalledTimes(1);
@@ -302,17 +994,360 @@ it("ignores repeated sign-in taps while the browser request is pending", async (
   await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
 });
 
+it("binds provider selection to the mobile PKCE authorization endpoint", async () => {
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "provider-sign-in" }));
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockAuthorizationEndpoints).toContain(
+    "https://issuer.example.test/api/auth/mobile-social-login/google-alias",
+  );
+  expect(storage.saveOAuthTransaction).toHaveBeenCalledWith(
+    "account",
+    expect.objectContaining({
+      codeVerifier: "test-verifier-1",
+      redirectUri: "kitezh://oauth/callback",
+      state: "test-state-1",
+    }),
+  );
+});
+
+it("uses native Google sign-in and continues through mobile PKCE without provider browser OAuth", async () => {
+  mockStartMobileGoogleLogin.mockResolvedValueOnce({
+    status: "authorized",
+    code: "kitezh-authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-google-sign-in" }),
+  );
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockStartMobileGoogleLogin).toHaveBeenCalledWith(
+    expect.objectContaining({
+      platform: expect.stringMatching(/^(ANDROID|IOS)$/),
+      clientId: "mobile-account",
+      idToken: "signed-google-id-token",
+      codeChallengeMethod: "S256",
+    }),
+    { locale: "en" },
+  );
+  expect(mockAuthorizationEndpoints).not.toContain(
+    "https://issuer.example.test/api/auth/mobile-social-login/google",
+  );
+});
+
+it("uses a native passkey challenge and exchanges the verified PKCE authorization code", async () => {
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-passkey-sign-in" }),
+  );
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockStartMobilePasskeyLogin).toHaveBeenCalledWith(
+    expect.objectContaining({
+      platform: expect.stringMatching(/^(ANDROID|IOS)$/),
+      username: "alice",
+      codeChallengeMethod: "S256",
+    }),
+    { locale: "en" },
+  );
+  expect(mockGetNativePasskey).toHaveBeenCalledWith({
+    challenge: "public-key-challenge",
+  });
+  expect(mockVerifyMobilePasskeyLogin).toHaveBeenCalledWith(
+    "passkey-transaction",
+    expect.objectContaining({ id: "credential-id" }),
+    { locale: "en" },
+  );
+  expect(mockAuthorizationEndpoints).toContain(
+    "https://issuer.example.test/authorize",
+  );
+});
+
+it("clears the passkey transaction and reports native credential failures", async () => {
+  mockGetNativePasskey.mockRejectedValueOnce(new Error("credential cancelled"));
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-passkey-sign-in" }),
+  );
+
+  expect(await screen.findByText("passkey-authentication-failed")).toBeTruthy();
+  expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  expect(mockVerifyMobilePasskeyLogin).not.toHaveBeenCalled();
+});
+
+it.each([
+  [401, "login-credentials-invalid"],
+  [503, "authorization-failed"],
+])(
+  "maps native password login HTTP %i to a stable error",
+  async (status, error) => {
+    mockStartMobileLogin.mockRejectedValueOnce(
+      Object.assign(new Error("server rejected login"), { status }),
+    );
+    renderProvider();
+    await screen.findByText("signed-out");
+
+    fireEvent.press(screen.getByRole("button", { name: "native-sign-in" }));
+
+    expect(await screen.findByText(error)).toBeTruthy();
+    expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account");
+  },
+);
+
+it("reports an invalid native passkey PKCE request without asking for a credential", async () => {
+  mockSetRequestHasCodeVerifier(false);
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-passkey-sign-in" }),
+  );
+
+  expect(await screen.findByText("passkey-authentication-failed")).toBeTruthy();
+  expect(mockStartMobilePasskeyLogin).not.toHaveBeenCalled();
+  expect(mockGetNativePasskey).not.toHaveBeenCalled();
+});
+
+it("cancels a native login attempt and clears its saved transaction", async () => {
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "cancel-native-login" }));
+
+  expect(await screen.findByText("signed-out")).toBeTruthy();
+  await waitFor(() =>
+    expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account"),
+  );
+});
+
+it("uses native passkey authorization directly when the server does not require a credential", async () => {
+  mockStartMobilePasskeyLogin.mockResolvedValueOnce({
+    status: "authorized",
+    code: "authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-passkey-sign-in" }),
+  );
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockGetNativePasskey).not.toHaveBeenCalled();
+  expect(mockVerifyMobilePasskeyLogin).not.toHaveBeenCalled();
+});
+
+it("maps a Google account-link conflict to an explicit local-link outcome", async () => {
+  mockStartMobileGoogleLogin.mockRejectedValueOnce(
+    Object.assign(new Error("Google identity belongs to a local account"), {
+      status: 409,
+    }),
+  );
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-google-sign-in" }),
+  );
+
+  await waitFor(() =>
+    expect(screen.getByText("google-account-link-required")).toBeTruthy(),
+  );
+  expect(mockAuthorizationEndpoints).not.toContain(
+    "https://issuer.example.test/api/auth/mobile-social-login/google",
+  );
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+});
+
+it("uses the system-browser provider flow when native Google is not configured", async () => {
+  mockNativeSocialConfigured.mockReturnValue(false);
+  mockPromptAsync.mockResolvedValueOnce({
+    type: "success",
+    params: { code: "provider-code", state: "ignored" },
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "native-google-sign-in" }),
+  );
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockAuthorizationEndpoints).toContain(
+    "https://issuer.example.test/api/auth/mobile-social-login/google",
+  );
+  expect(mockStartMobileGoogleLogin).not.toHaveBeenCalled();
+});
+
+it("uses the native credential API and exchanges its validated PKCE code", async () => {
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-sign-in" }));
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockStartMobileLogin).toHaveBeenCalledWith(
+    expect.objectContaining({
+      platform: expect.stringMatching(/^(ANDROID|IOS)$/),
+      clientId: "mobile-account",
+      redirectUri: "kitezh://oauth/callback",
+      scope: "openid account-api",
+      state: "test-state-2",
+      codeChallenge: "test-challenge-2",
+      codeChallengeMethod: "S256",
+      username: "alice",
+      password: "secret",
+      captchaToken: null,
+    }),
+    { locale: "en" },
+  );
+  expect(mockExchangeCode).toHaveBeenCalledWith(
+    expect.objectContaining({
+      code: "authorization-code",
+      extraParams: { code_verifier: "test-verifier-2" },
+    }),
+    expect.any(Object),
+  );
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+});
+
+it("completes native MFA and a required action before the PKCE exchange", async () => {
+  jest.mocked(mockStartMobileLogin).mockResolvedValueOnce({
+    status: "mfa_required",
+    transactionId: "login-transaction",
+  });
+  jest.mocked(mockSubmitMobileLoginMfa).mockResolvedValueOnce({
+    status: "required_actions",
+    transactionId: "login-transaction",
+    actions: [
+      {
+        key: "UPDATE_PASSWORD",
+        displayName: "Update password",
+        description: "Choose a new password",
+        version: 1,
+      },
+    ],
+  });
+  jest.mocked(mockSubmitMobileLoginAction).mockResolvedValueOnce({
+    status: "authorized",
+    code: "authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-sign-in" }));
+  expect(await screen.findByText("mfa")).toBeTruthy();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByRole("button", { name: "submit-login-mfa" }));
+  expect(await screen.findByText("actions")).toBeTruthy();
+  expect(mockSubmitMobileLoginMfa).toHaveBeenCalledWith(
+    "login-transaction",
+    "123456",
+    { locale: "en" },
+  );
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+
+  fireEvent.press(screen.getByRole("button", { name: "submit-login-action" }));
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockSubmitMobileLoginAction).toHaveBeenCalledWith(
+    "login-transaction",
+    "UPDATE_PASSWORD",
+    { newPassword: "a-long-password" },
+    { locale: "en" },
+  );
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+});
+
+it("requires explicit native consent approval before the PKCE exchange", async () => {
+  jest.mocked(mockStartMobileLogin).mockResolvedValueOnce({
+    status: "consent_required",
+    transactionId: "consent-transaction",
+    clientName: "Kitezh Account",
+    scopes: [
+      {
+        name: "profile",
+        displayName: "Profile",
+        description: "Read your profile",
+      },
+    ],
+  });
+  jest.mocked(mockSubmitMobileLoginConsent).mockResolvedValueOnce({
+    status: "authorized",
+    code: "authorization-code",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-sign-in" }));
+  expect(await screen.findByText("consent")).toBeTruthy();
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+
+  fireEvent.press(
+    screen.getByRole("button", { name: "approve-login-consent" }),
+  );
+
+  await waitFor(() => expect(mockExchangeCode).toHaveBeenCalledTimes(1));
+  expect(mockSubmitMobileLoginConsent).toHaveBeenCalledWith(
+    "consent-transaction",
+    true,
+    { locale: "en" },
+  );
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+});
+
+it("never exchanges a code after native consent is denied", async () => {
+  jest.mocked(mockStartMobileLogin).mockResolvedValueOnce({
+    status: "consent_required",
+    transactionId: "consent-transaction",
+    clientName: "Kitezh Account",
+    scopes: [],
+  });
+  jest.mocked(mockSubmitMobileLoginConsent).mockResolvedValueOnce({
+    status: "denied",
+    state: "test-state-2",
+    redirectUri: "kitezh://oauth/callback",
+  });
+  renderProvider();
+  await screen.findByText("signed-out");
+
+  fireEvent.press(screen.getByRole("button", { name: "native-sign-in" }));
+  expect(await screen.findByText("consent")).toBeTruthy();
+  fireEvent.press(screen.getByRole("button", { name: "deny-login-consent" }));
+
+  await waitFor(() => expect(screen.getByText("consent-denied")).toBeTruthy());
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+});
+
 it("resumes a cold-start callback from its SecureStore PKCE transaction", async () => {
   jest
     .spyOn(Linking, "getInitialURL")
     .mockResolvedValueOnce(
-      "kitezh://account/oauth/callback?code=resumed-authorization-code&state=test-state",
+      "kitezh://oauth/callback?code=resumed-authorization-code&state=test-state",
     );
   jest.mocked(storage.consumeOAuthTransaction).mockResolvedValueOnce({
     clientId: "mobile-account",
     codeVerifier: "persisted-test-verifier",
     createdAt: Date.now(),
-    redirectUri: "kitezh://account/oauth/callback",
+    redirectUri: "kitezh://oauth/callback",
     state: "test-state",
   });
 
@@ -325,7 +1360,62 @@ it("resumes a cold-start callback from its SecureStore PKCE transaction", async 
     }),
     expect.any(Object),
   );
-  expect(await screen.findByText("signed-in")).toBeVisible();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
+});
+
+it("clears the pending transaction when a cold-start callback has no state", async () => {
+  jest
+    .spyOn(Linking, "getInitialURL")
+    .mockResolvedValueOnce(
+      "kitezh://oauth/callback?code=untrusted-authorization-code",
+    );
+
+  renderProvider();
+
+  await waitFor(() =>
+    expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account"),
+  );
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
+});
+
+it.each([
+  ["no URL", null],
+  [
+    "an unregistered URL",
+    "https://untrusted.example.test/callback?state=state",
+  ],
+] as const)(
+  "ignores cold-start callbacks from %s",
+  async (_description, url) => {
+    jest.spyOn(Linking, "getInitialURL").mockResolvedValueOnce(url);
+
+    renderProvider();
+
+    expect(await screen.findByText("signed-out")).toBeTruthy();
+    expect(storage.consumeOAuthTransaction).not.toHaveBeenCalled();
+    expect(mockExchangeCode).not.toHaveBeenCalled();
+  },
+);
+
+it("ignores duplicate cold-start callback parameters", async () => {
+  jest
+    .spyOn(Linking, "getInitialURL")
+    .mockResolvedValueOnce("kitezh://oauth/callback?state=duplicate");
+  jest.spyOn(ExpoLinking, "parse").mockReturnValueOnce({
+    queryParams: {
+      code: ["first-code", "second-code"],
+      state: ["first-state", "second-state"],
+    },
+  } as never);
+
+  renderProvider();
+
+  await waitFor(() =>
+    expect(storage.clearOAuthTransaction).toHaveBeenCalledWith("account"),
+  );
+  expect(mockExchangeCode).not.toHaveBeenCalled();
+  expect(await screen.findByText("authorization-failed")).toBeTruthy();
 });
 
 it("clears a session after refresh failure and rejects use outside its provider", async () => {
@@ -338,13 +1428,51 @@ it("clears a session after refresh failure and rejects use outside its provider"
   mockRefresh.mockRejectedValue(new Error("refresh denied"));
   renderProvider();
   await screen.findByText("signed-in");
-  fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
   await waitFor(() =>
     expect(storage.clearSession).toHaveBeenCalledWith("account"),
   );
-  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(await screen.findByText("signed-out")).toBeTruthy();
   expect(() => render(<AuthProbe />)).toThrow(
     "useMobileAuth must be used inside MobileAuthProvider",
+  );
+});
+
+it("coalesces concurrent forced refreshes into one token request", async () => {
+  const pendingRefresh = deferred<{
+    accessToken: string;
+    refreshToken: string;
+    idToken: string;
+    expiresIn: number;
+    issuedAt: number;
+  }>();
+  jest.mocked(storage.readSession).mockResolvedValue({
+    accessToken: "expired-access-token",
+    refreshToken: "stored-refresh-token",
+    idToken: "stored-id-token",
+    expiresAt: 0,
+  });
+  mockRefresh.mockReturnValueOnce(pendingRefresh.promise);
+  renderProvider();
+  await screen.findByText("signed-in");
+
+  fireEvent.press(screen.getByRole("button", { name: "refresh-twice" }));
+  await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+  pendingRefresh.resolve({
+    accessToken: "refreshed-access-token",
+    refreshToken: "rotated-refresh-token",
+    idToken: "refreshed-id-token",
+    expiresIn: 300,
+    issuedAt: Math.floor(Date.now() / 1000),
+  });
+
+  await waitFor(() => expect(storage.writeSession).toHaveBeenCalledTimes(1));
+  expect(storage.writeSession).toHaveBeenCalledWith(
+    expect.objectContaining({
+      accessToken: "refreshed-access-token",
+      refreshToken: "rotated-refresh-token",
+    }),
+    "account",
   );
 });
 
@@ -366,10 +1494,10 @@ it("does not restore a session when logout races a pending refresh", async () =>
   renderProvider();
   await screen.findByText("signed-in");
 
-  fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
   await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByRole("button", { name: "sign-out" }));
-  expect(await screen.findByText("signing-out")).toBeVisible();
+  fireEvent.press(screen.getByRole("button", { name: "sign-out" }));
+  expect(await screen.findByText("signing-out")).toBeTruthy();
 
   pendingRefresh.resolve({
     accessToken: "stale-access-token",
@@ -379,9 +1507,34 @@ it("does not restore a session when logout races a pending refresh", async () =>
     issuedAt: Math.floor(Date.now() / 1000),
   });
 
-  expect(await screen.findByText("signed-out")).toBeVisible();
+  expect(await screen.findByText("signed-out")).toBeTruthy();
   expect(storage.writeSession).not.toHaveBeenCalled();
   expect(storage.clearSession).toHaveBeenCalledWith("account");
+});
+
+it("clears a refreshed token when logout races its storage write", async () => {
+  const pendingWrite = deferred<void>();
+  jest.mocked(storage.readSession).mockResolvedValue({
+    accessToken: "expired-access-token",
+    refreshToken: "stored-refresh-token",
+    idToken: "stored-id-token",
+    expiresAt: 0,
+  });
+  jest.mocked(storage.writeSession).mockReturnValueOnce(pendingWrite.promise);
+  renderProvider();
+  await screen.findByText("signed-in");
+
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
+  await waitFor(() => expect(storage.writeSession).toHaveBeenCalledTimes(1));
+  fireEvent.press(screen.getByRole("button", { name: "sign-out" }));
+  expect(await screen.findByText("signing-out")).toBeTruthy();
+
+  pendingWrite.resolve(undefined);
+
+  expect(await screen.findByText("signed-out")).toBeTruthy();
+  await waitFor(() => expect(storage.clearSession).toHaveBeenCalledTimes(1));
+  expect(screen.getByText("no-session")).toBeTruthy();
+  expect(screen.getByText("signed-out")).toBeTruthy();
 });
 
 it("serializes reauthentication after a stale refresh completes", async () => {
@@ -402,9 +1555,9 @@ it("serializes reauthentication after a stale refresh completes", async () => {
   renderProvider();
   await screen.findByText("signed-in");
 
-  fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+  fireEvent.press(screen.getByRole("button", { name: "refresh" }));
   await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
-  fireEvent.click(screen.getByRole("button", { name: "sign-in" }));
+  fireEvent.press(screen.getByRole("button", { name: "sign-in" }));
   expect(mockPromptAsync).not.toHaveBeenCalled();
 
   pendingRefresh.resolve({
@@ -415,7 +1568,7 @@ it("serializes reauthentication after a stale refresh completes", async () => {
     issuedAt: Math.floor(Date.now() / 1000),
   });
   await waitFor(() => expect(mockPromptAsync).toHaveBeenCalledTimes(1));
-  expect(await screen.findByText("signed-in")).toBeVisible();
+  expect(await screen.findByText("signed-in")).toBeTruthy();
   expect(storage.writeSession).toHaveBeenCalledTimes(1);
   expect(storage.writeSession).toHaveBeenCalledWith(
     expect.objectContaining({ accessToken: "access-token" }),

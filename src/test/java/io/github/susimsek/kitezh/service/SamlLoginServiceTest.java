@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -30,6 +32,7 @@ import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -148,6 +151,24 @@ class SamlLoginServiceTest {
     }
 
     @Test
+    void resolvesRegistrationIdWhenProviderAliasDoesNotMatch() {
+        stubProviderSettings();
+        stubMapper();
+        UserEntity user = new UserEntity();
+        user.setUsername("saml_saml-e2e_existing");
+        SocialIdentityEntity identity = new SocialIdentityEntity("saml-e2e", "subject-1", user);
+        when(providerRepository.findByAliasIgnoreCase("registration-id"))
+                .thenReturn(Optional.empty());
+        when(providerRepository.findByRegistrationId("registration-id"))
+                .thenReturn(Optional.of(provider));
+        when(socialIdentityRepository.findByProviderAndSubject("saml-e2e", "subject-1"))
+                .thenReturn(Optional.of(identity));
+
+        assertThat(service().findOrCreate("registration-id", authentication()))
+                .isEqualTo("saml_saml-e2e_existing");
+    }
+
+    @Test
     void linksVerifiedSamlSubjectToAnAuthenticatedLocalUser() {
         stubProviderSettings();
         stubMapper();
@@ -233,6 +254,83 @@ class SamlLoginServiceTest {
     }
 
     @Test
+    void rejectsAnEnabledProviderThatIsNotConfiguredAsSaml() {
+        provider.setProviderType("oidc");
+
+        assertThatThrownBy(() -> service().findOrCreate("saml-e2e", authentication()))
+                .isInstanceOf(AuthenticationServiceException.class)
+                .hasMessageContaining("disabled or unknown");
+    }
+
+    @Test
+    void mapsConfiguredMultiValueClaimsWithoutTrustingTheEmail() {
+        stubProviderSettings();
+        stubMapper();
+        provider.setTrustEmail(false);
+        config.setPrincipalAttribute("uid");
+        config.setEmailAttribute("mail");
+        config.setFirstNameAttribute(" ");
+        config.setLastNameAttribute(null);
+        config.setGroupsAttribute("groups");
+        Saml2AuthenticatedPrincipal principal = mock(Saml2AuthenticatedPrincipal.class);
+        when(principal.getAttributes())
+                .thenReturn(
+                        Map.of(
+                                "uid", List.of(" subject-42 "),
+                                "mail", List.of("ADA@EXAMPLE.TEST"),
+                                "groups", List.of("engineering", "platform")));
+        when(principal.getAttribute("uid")).thenReturn(List.of(" subject-42 "));
+        when(principal.getAttribute("mail")).thenReturn(List.of("ADA@EXAMPLE.TEST"));
+        when(principal.getAttribute("groups")).thenReturn(List.of("engineering", "platform"));
+        Saml2Authentication samlAuthentication =
+                new Saml2Authentication(
+                        principal,
+                        "saml-response",
+                        List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        when(socialIdentityRepository.findByProviderAndSubject("saml-e2e", "subject-42"))
+                .thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase("ada@example.test")).thenReturn(Optional.empty());
+        when(authorityRepository.findByName(AuthoritiesConstants.USER))
+                .thenReturn(Optional.of(new AuthorityEntity(2L, AuthoritiesConstants.USER)));
+        when(passwordEncoder.encode(anyString())).thenReturn("encoded-random-password");
+        when(userRepository.save(any(UserEntity.class)))
+                .thenAnswer(
+                        invocation -> {
+                            UserEntity user = invocation.getArgument(0);
+                            user.setId(42L);
+                            return user;
+                        });
+
+        service().findOrCreate("saml-e2e", samlAuthentication);
+
+        verify(mapperService)
+                .apply(
+                        eq("saml-e2e"),
+                        argThat(
+                                attributes ->
+                                        "subject-42".equals(attributes.get("sub"))
+                                                && attributes
+                                                        .get("groups")
+                                                        .equals(
+                                                                List.of(
+                                                                        "engineering",
+                                                                        "platform"))),
+                        any(UserEntity.class),
+                        eq(true),
+                        anyBoolean(),
+                        anyString(),
+                        any(SocialIdentityEntity.class));
+        verify(userRepository)
+                .save(
+                        argThat(
+                                user ->
+                                        "ada@example.test".equals(user.getEmail())
+                                                && !user.isEmailVerified()
+                                                && user.getFirstName() == null
+                                                && user.getLastName() == null));
+    }
+
+    @Test
     void rejectsConflictingSamlLinks() {
         UserEntity user = new UserEntity();
         user.setUsername("ada");
@@ -292,6 +390,22 @@ class SamlLoginServiceTest {
         assertThat(invoke("normalizeEmail", new Class<?>[] {String.class}, " ")).isNull();
         assertThat(invoke("first", new Class<?>[] {List.class}, List.of(" subject ")))
                 .isEqualTo("subject");
+        assertThat(invoke("first", new Class<?>[] {List.class}, (Object) null)).isNull();
+        assertThat(invoke("first", new Class<?>[] {List.class}, List.of())).isNull();
+        assertThat(
+                        invoke(
+                                "value",
+                                new Class<?>[] {Map.class, String.class},
+                                Map.of("claim", Set.of(" iterable value ")),
+                                "claim"))
+                .isEqualTo("iterable value");
+        assertThat(
+                        invoke(
+                                "value",
+                                new Class<?>[] {Map.class, String.class},
+                                Map.of("claim", Set.of()),
+                                "claim"))
+                .isNull();
         assertThat(
                         invoke(
                                 "value",
@@ -316,6 +430,20 @@ class SamlLoginServiceTest {
                                         "sub"))
                 .isInstanceOf(InvocationTargetException.class)
                 .hasCauseInstanceOf(AuthenticationServiceException.class);
+        assertThat(
+                        invoke(
+                                "ensureRequiredClaims",
+                                new Class<?>[] {Map.class, String.class},
+                                Map.of("sub", "subject"),
+                                null))
+                .isNull();
+        assertThat(
+                        invoke(
+                                "ensureRequiredClaims",
+                                new Class<?>[] {Map.class, String.class},
+                                Map.of("sub", "subject"),
+                                " ,sub,"))
+                .isNull();
         assertThatThrownBy(
                         () ->
                                 invoke(

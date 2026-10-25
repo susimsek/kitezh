@@ -25,6 +25,7 @@ import org.springframework.security.web.webauthn.api.ResidentKeyRequirement;
 import org.springframework.security.web.webauthn.api.UserVerificationRequirement;
 import org.springframework.security.web.webauthn.authentication.WebAuthnAuthentication;
 import org.springframework.security.web.webauthn.jackson.WebauthnJacksonModule;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import tools.jackson.databind.module.SimpleModule;
@@ -82,6 +83,11 @@ public final class SecurityJsonMapper {
 
     public JsonMapper delegate() {
         return delegate;
+    }
+
+    public Map<String, Object> toWebauthnMap(Object value) {
+        byte[] json = webauthnDelegate.writeValueAsBytes(value);
+        return webauthnDelegate.readValue(json, new TypeReference<>() {});
     }
 
     public void writeSessionAttribute(Object value, OutputStream outputStream) throws IOException {

@@ -297,6 +297,33 @@ test("scope detail deep link loads independently and edit persists through the A
   }
 });
 
+test("sparse editable client scope uses safe defaults for optional metadata", async () => {
+  const harness = await fixture({
+    hash: "#/admin/client-scopes/minimal/edit",
+    response: (path) =>
+      path === "/api/admin/client-scopes/minimal"
+        ? { id: "minimal", name: "minimal", builtIn: false }
+        : undefined,
+  });
+  try {
+    await settle();
+    const form = harness.document.querySelector(
+      '[data-form="admin-client-scope-edit"]',
+    );
+    assert.ok(form);
+    assert.equal(form.elements.namedItem("displayName").value, "");
+    assert.equal(form.elements.namedItem("description").value, "");
+    assert.equal(form.elements.namedItem("consentScreenText").value, "");
+    assert.equal(form.elements.namedItem("groupClaimName").value, "groups");
+    assert.equal(form.elements.namedItem("displayOnConsentScreen").checked, false);
+    assert.equal(form.elements.namedItem("includeInTokenScope").checked, true);
+    assert.equal(form.elements.namedItem("groupMapperEnabled").checked, false);
+    assert.equal(form.elements.namedItem("groupMapperFullPath").checked, true);
+  } finally {
+    harness.restore();
+  }
+});
+
 test("search submits server sorting and pagination once while pending, preserving its label and spinner", async () => {
   let finish;
   const harness = await fixture({

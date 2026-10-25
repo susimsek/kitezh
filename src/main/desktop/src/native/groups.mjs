@@ -265,7 +265,7 @@ export function createGroupScreens({
     const value = text(key);
     state.notice = value;
     alertTimer = setTimeout(() => {
-      if (state.notice === value && document === ownerDocument) {
+      if (state.notice === value && globalThis.document === ownerDocument) {
         state.notice = null;
         render();
       }
@@ -735,7 +735,7 @@ export function createGroupScreens({
         ++readGeneration;
         searchTimer = setTimeout(() => {
           if (
-            document === ownerDocument &&
+            globalThis.document === ownerDocument &&
             state.route === (members ? "group-detail" : "groups")
           ) {
             syncUrl(true);
@@ -823,7 +823,7 @@ export function createGroupScreens({
         render();
         if (!event.isComposing && event.target.value.trim().length >= 2)
           candidateTimer = setTimeout(() => {
-            if (document === ownerDocument) void candidates();
+            if (globalThis.document === ownerDocument) void candidates();
           }, 300);
       });
     document

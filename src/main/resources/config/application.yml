@@ -150,6 +150,14 @@ management:
           include: readinessState,db
 
 app:
+  mobile:
+    captcha:
+      android-site-key: ${APP_MOBILE_CAPTCHA_ANDROID_SITE_KEY:}
+      ios-site-key: ${APP_MOBILE_CAPTCHA_IOS_SITE_KEY:}
+      android-package-name: ${APP_MOBILE_CAPTCHA_ANDROID_PACKAGE_NAME:io.github.susimsek.kitezh.mobile}
+      ios-bundle-id: ${APP_MOBILE_CAPTCHA_IOS_BUNDLE_ID:io.github.susimsek.kitezh.mobile}
+    ios-team-id: ${APP_IOS_TEAM_ID:}
+    android-sha256-cert-fingerprint: "${APP_ANDROID_SHA256_CERT_FINGERPRINT:49:C2:E1:D2:E3:7C:C3:F2:18:2A:CE:73:50:EE:16:36:9B:A2:68:92:C9:55:85:C7:12:CA:C3:72:D2:8D:DB:A6}"
   github-api:
     token: ${GITHUB_API_TOKEN:}
   desktop:
@@ -170,9 +178,8 @@ app:
     obfuscate:
       replacement: ${APP_LOG_OBFUSCATE_REPLACEMENT:***}
       headers: ${APP_LOG_OBFUSCATE_HEADERS:Authorization,Cookie,Set-Cookie,Proxy-Authorization,DPoP,X-Api-Key}
-      body-fields: ${APP_LOG_OBFUSCATE_BODY_FIELDS:access_token,refresh_token,id_token,client_secret,password,authorization,cookie,token,secret,api_key,assertion,saml_response,private_key,code,code_verifier,captchaToken,response,siteKey,apiKey,auth_req_id,client_notification_token,id_token_hint,login_hint_token,user_code,dpop,dpop_proof,jwk}
-      parameters: ${APP_LOG_OBFUSCATE_PARAMETERS:access_token,refresh_token,id_token,client_secret,client_assertion,password,authorization,token,secret,api_key,assertion,code,code_verifier,state,nonce,request,request_uri,id_token_hint,auth_req_id,client_notification_token,login_hint_token,user_code,captchaToken,response,key}
-      cookies: ${APP_LOG_OBFUSCATE_COOKIES:SESSION}
+      body-fields: ${APP_LOG_OBFUSCATE_BODY_FIELDS:access_token,refresh_token,id_token,client_secret,password,authorization,cookie,token,secret,api_key,assertion,saml_response,samlresponse,samlrequest,relaystate,private_key,code,code_verifier,captchaToken,response,siteKey,apiKey,auth_req_id,client_notification_token,id_token_hint,login_hint_token,user_code,dpop,dpop_proof,jwk}
+      parameters: ${APP_LOG_OBFUSCATE_PARAMETERS:access_token,refresh_token,id_token,client_secret,client_assertion,password,authorization,token,secret,api_key,assertion,samlresponse,samlrequest,relaystate,code,code_verifier,state,nonce,request,request_uri,id_token_hint,auth_req_id,client_notification_token,login_hint_token,user_code,captchaToken,response,key}
     client:
       enabled: ${APP_LOG_CLIENT_ENABLED:false}
       level: ${APP_LOG_CLIENT_LEVEL:BASIC}
@@ -188,13 +195,15 @@ app:
   authorization-server:
     issuer: https://kitezh.local
     offline-session-idle: ${APP_OFFLINE_SESSION_IDLE:P30D}
+  mcp:
+    resource-audience: ${APP_MCP_RESOURCE_AUDIENCE:https://kitezh-mcp.onrender.com/mcp}
   dpop:
     nonce-required: ${APP_DPOP_NONCE_REQUIRED:false}
     nonce-ttl: ${APP_DPOP_NONCE_TTL:PT5M}
   web-authn:
     rp-name: Kitezh
     rp-id: ""
-    allowed-origins: ""
+    allowed-origins: ${WEBAUTHN_ALLOWED_ORIGINS:}
     timeout-seconds: 300
     resident-key: REQUIRED
     user-verification: REQUIRED

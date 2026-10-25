@@ -1,5 +1,5 @@
 import test from "node:test";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import assert from "node:assert/strict";
@@ -119,6 +119,12 @@ test("accepts only a social-link callback without fragment data", () => {
   );
 });
 
+test("returns safe empty results for malformed callback URLs", () => {
+  assert.equal(parseAuthCallback("not a URL"), null);
+  assert.equal(parseLogoutCallback("not a URL"), false);
+  assert.equal(parseSocialLinkCallback("not a URL"), null);
+});
+
 test("sanitizes callback data before sending it to the renderer", () => {
   assert.equal(
     sanitizedAuthCallback("state-1"),
@@ -200,11 +206,33 @@ test("persists PKCE transactions encrypted and restores them after restart", asy
       await readPendingAuthorizationStore(file, storage, 420_000),
       {},
     );
+    await writeFile(file, Buffer.from("not-json").toString("base64"));
+    await assert.rejects(readPendingAuthorizationStore(file, storage), {
+      name: "SyntaxError",
+    });
     await writePendingAuthorizationStore(file, {}, storage);
     await assert.rejects(readFile(file), { code: "ENOENT" });
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
+});
+
+test("refuses PKCE persistence and restoration without secure storage", async () => {
+  const unavailableStorage = {
+    isEncryptionAvailable: () => false,
+    encryptString: () => assert.fail("encryption must not run"),
+    decryptString: () => assert.fail("decryption must not run"),
+  };
+  const file = path.join(os.tmpdir(), "kitezh-unavailable-pkce.bin");
+
+  await assert.rejects(
+    writePendingAuthorizationStore(file, {}, unavailableStorage),
+    /Secure desktop storage is unavailable/,
+  );
+  await assert.rejects(
+    readPendingAuthorizationStore(file, unavailableStorage),
+    /Secure desktop storage is unavailable/,
+  );
 });
 
 test("exchanges the authorization code with PKCE and validates the token response", async () => {
@@ -243,6 +271,32 @@ test("exchanges the authorization code with PKCE and validates the token respons
   assert.equal(tokens.refreshToken, "refresh");
 });
 
+test("rejects authorization token responses with invalid expiry data", async () => {
+  const pending = {
+    state: "state",
+    codeVerifier: "verifier",
+    clientId: "desktop-admin-console",
+    redirectUri: "kitezh://oauth/callback",
+    createdAt: Date.now(),
+  };
+  const fetcher = async () =>
+    new Response(
+      JSON.stringify({ access_token: "access", expires_in: Number.NaN }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+
+  await assert.rejects(
+    exchangeAuthorizationCode(
+      fetcher,
+      "https://example.test",
+      pending,
+      "code",
+      { appVersion: "0.1.4", clientPlatform: "desktop", os: "darwin" },
+    ),
+    /Invalid desktop token response/,
+  );
+});
+
 test("trusts only the packaged renderer origin", () => {
   assert.equal(isTrustedRendererUrl("app://renderer/"), true);
   assert.equal(isTrustedRendererFrame("app://renderer/admin/"), true);
@@ -273,6 +327,18 @@ test("accepts only configured API and external origins", () => {
   assert.equal(
     isAllowedExternalUrl(
       "https://github.com/login/oauth/authorize?redirect_uri=https%3A%2F%2Fevil.example%2Fcallback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl(
+      "https://github.com/login/oauth/authorize?redirect_uri=kitezh%3A%2F%2Foauth%2Fcallback&redirect_uri=kitezh%3A%2F%2Foauth%2Fcallback",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedExternalUrl(
+      "https://kitezh.onrender.com/connect/logout?post_logout_redirect_uri=kitezh%3A%2F%2Flogout%2Fcallback&post_logout_redirect_uri=kitezh%3A%2F%2Flogout%2Fcallback",
     ),
     false,
   );
@@ -350,6 +416,22 @@ test("reports when both the requested and fallback shortcuts are unavailable", (
   assert.deepEqual(
     registerGlobalShortcutWithFallback(
       adapter,
+      "CommandOrControl+Shift+K",
+      "Alt+Space",
+      () => {},
+    ),
+    { registered: false, accelerator: "CommandOrControl+Shift+K" },
+  );
+
+  const throwingAdapter = {
+    unregisterAll() {},
+    register() {
+      throw new Error("shortcut registration failed");
+    },
+  };
+  assert.deepEqual(
+    registerGlobalShortcutWithFallback(
+      throwingAdapter,
       "CommandOrControl+Shift+K",
       "Alt+Space",
       () => {},

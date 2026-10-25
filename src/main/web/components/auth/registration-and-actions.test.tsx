@@ -157,6 +157,67 @@ describe("registration and account action forms", () => {
     expect(await screen.findByText(dictionary.accountActions.verifyDone)).toBeVisible();
   });
 
+  it("maps forgot-password field failures and reports unexpected failures", async () => {
+    const { rerender } = render(<ForgotPasswordForm locale="en" dictionary={dictionary} />);
+    fireEvent.change(screen.getByLabelText(dictionary.accountActions.identifier), {
+      target: { value: "user@example.test" },
+    });
+    mockSubmitAccountAction.mockRejectedValueOnce({
+      violations: [{ field: "identifier" }],
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.accountActions.send }));
+    expect(await screen.findByText(dictionary.account.validation.invalid)).toBeVisible();
+
+    mockSubmitAccountAction.mockRejectedValueOnce({ errorCode: "unknown" });
+    fireEvent.change(screen.getByLabelText(dictionary.accountActions.identifier), {
+      target: { value: "another-user" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.accountActions.send }));
+    expect(await screen.findByText("Operation failed")).toBeVisible();
+
+    searchParams = new URLSearchParams("token=verify-token");
+    mockSubmitAccountAction.mockRejectedValueOnce({ errorCode: "expired" });
+    rerender(<VerifyEmailView locale="en" dictionary={dictionary} />);
+    fireEvent.click(screen.getByRole("button", { name: dictionary.accountActions.verifyTitle }));
+    expect(await screen.findByText("Operation failed")).toBeVisible();
+  });
+
+  it("allows optional reset OTP and handles server field errors", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ passwordResetOtpMode: "if-configured" }),
+    }) as typeof fetch;
+    searchParams = new URLSearchParams("token=reset-token");
+    mockSubmitAccountAction.mockRejectedValueOnce({
+      violations: [{ field: "otpCode" }, { field: "newPassword" }, { field: "confirmPassword" }],
+    });
+    render(<ResetPasswordForm locale="en" dictionary={dictionary} />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText(dictionary.accountActions.otpCode)).toBeVisible(),
+    );
+    fireEvent.change(screen.getByLabelText(dictionary.accountActions.newPassword), {
+      target: { value: "Change-me12!" },
+    });
+    fireEvent.change(screen.getByLabelText(dictionary.accountActions.confirmPassword), {
+      target: { value: "Change-me12!" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.accountActions.reset }));
+    expect(await screen.findByText(dictionary.accountActions.otpInvalid)).toBeVisible();
+    expect(screen.getByText(dictionary.account.validation.password)).toBeVisible();
+    expect(screen.getByText(dictionary.accountActions.passwordMismatch)).toBeVisible();
+  });
+
+  it("renders verification links without a token as invalid", () => {
+    searchParams = new URLSearchParams();
+    render(<VerifyEmailView locale="en" dictionary={dictionary} />);
+
+    expect(screen.getByText(dictionary.accountActions.invalidLink)).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: dictionary.accountActions.verifyTitle }),
+    ).not.toBeInTheDocument();
+  });
+
   it("opens the user menu, falls back to initials, and handles logout", async () => {
     const onLogout = jest.fn().mockResolvedValue(undefined);
     render(

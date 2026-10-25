@@ -19,7 +19,11 @@ const forbidden = [
   },
   {
     label: "DOM utilities",
-    pattern: /HTMLElement|querySelector|createElement\(/i,
+    pattern: /HTMLElement|querySelector|document\.createElement\(/i,
+  },
+  {
+    label: "Web test renderer",
+    pattern: /@testing-library\/react(?:["']|\/)|fireEvent\.(?:click|change)\(/i,
   },
 ];
 
@@ -37,8 +41,7 @@ async function sourceFiles(directory) {
     .filter(
       (entry) =>
         entry.isFile() &&
-        /\.(?:js|jsx|mjs|ts|tsx|json)$/.test(entry.name) &&
-        !entry.name.endsWith(".coverage.test.tsx"),
+        /\.(?:js|jsx|mjs|ts|tsx|json)$/.test(entry.name),
     )
     .map((entry) => path.join(directory, entry.name));
   return [...localFiles, ...(await Promise.all(nestedDirectories)).flat()];
@@ -73,6 +76,24 @@ const violations = (
     }),
   )
 ).flat();
+
+const packageManifest = JSON.parse(
+  await readFile(path.join(root, "package.json"), "utf8"),
+);
+const appDependencies = {
+  ...packageManifest.dependencies,
+  ...packageManifest.devDependencies,
+};
+for (const dependency of ["react-dom", "react-native-web"]) {
+  if (dependency in appDependencies) {
+    violations.push(`package.json declares web-only dependency ${dependency}`);
+  }
+}
+for (const [scriptName, script] of Object.entries(packageManifest.scripts ?? {})) {
+  if (/expo\s+export\s+--platform\s+web|build:web/i.test(`${scriptName} ${script}`)) {
+    violations.push(`package.json script ${scriptName} exports the web platform`);
+  }
+}
 
 if (violations.length > 0) {
   console.error("Native boundary violations detected:");

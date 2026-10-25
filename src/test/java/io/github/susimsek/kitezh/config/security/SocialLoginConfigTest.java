@@ -90,6 +90,18 @@ class SocialLoginConfigTest {
     }
 
     @Test
+    void skipsProvidersWithOnlyOneCredentialConfigured() {
+        List<ProviderCredentials> providers =
+                List.of(
+                        new ProviderCredentials("google", "id", ""),
+                        new ProviderCredentials("github", "", "secret"),
+                        new ProviderCredentials("linkedin", "id", null),
+                        new ProviderCredentials("microsoft", null, "secret"));
+
+        assertThat(SocialLoginConfig.registrations(providers)).isEmpty();
+    }
+
+    @Test
     void createsProviderSpecificRegistrations() {
         List<ProviderCredentials> providers =
                 List.of(
@@ -155,6 +167,56 @@ class SocialLoginConfigTest {
                                 .getUserInfoEndpoint()
                                 .getUserNameAttributeName())
                 .isEqualTo("subject");
+    }
+
+    @Test
+    void appliesGenericOidcDefaultsAndSkipsSamlRegistrations() {
+        ProviderCredentials generic =
+                new ProviderCredentials(
+                        "custom",
+                        "custom",
+                        "Custom",
+                        "oidc",
+                        "client-id",
+                        "client-secret",
+                        true,
+                        false,
+                        false,
+                        false,
+                        false,
+                        "sub",
+                        false,
+                        false,
+                        0,
+                        "always",
+                        "https://issuer.example/authorize",
+                        "https://issuer.example/token",
+                        null,
+                        null,
+                        null,
+                        "client_secret_basic",
+                        "openid",
+                        "sub",
+                        "custom");
+        ProviderCredentials saml =
+                new ProviderCredentials(
+                        "saml",
+                        "saml",
+                        "client-id",
+                        "client-secret",
+                        true,
+                        false,
+                        false,
+                        0,
+                        "always");
+
+        var registrations = SocialLoginConfig.registrations(List.of(generic, saml));
+
+        assertThat(registrations).hasSize(1);
+        assertThat(registrations.getFirst().getClientAuthenticationMethod())
+                .isEqualTo(ClientAuthenticationMethod.CLIENT_SECRET_BASIC);
+        assertThat(registrations.getFirst().getProviderDetails().getJwkSetUri()).isNull();
+        assertThat(registrations.getFirst().getProviderDetails().getIssuerUri()).isNull();
     }
 
     @Test

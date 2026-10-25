@@ -1,11 +1,33 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createServer } from "node:http";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
+// Keep fixture credentials stable between runs because iOS SecureStore survives
+// app data resets and can restore an Admin session from an earlier Maestro run.
 const fixtureTokens = {
-  accessToken: randomBytes(24).toString("hex"),
-  refreshToken: randomBytes(24).toString("hex"),
-  idToken: randomBytes(24).toString("hex"),
+  accessToken: "kitezh-e2e-account-access",
+  refreshToken: "kitezh-e2e-account-refresh",
+  idToken: "kitezh-e2e-account-id",
 };
+const fixtureAdminTokens = {
+  accessToken: "kitezh-e2e-admin-access",
+  refreshToken: "kitezh-e2e-admin-refresh",
+  idToken: "kitezh-e2e-admin-id",
+};
+
+const fixtureCibaRequests = ["approve", "deny"].map((decision) => ({
+  authReqId: `fixture-${decision}`,
+  userCode: decision === "approve" ? "ABCD-EFGH" : "JKLM-NPQR",
+  bindingMessage: `Fixture ${decision} request`,
+  authorizedScopes: "openid profile",
+  deliveryMode: "poll",
+  createdAt: new Date().toISOString(),
+  expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+  status: "pending",
+  mfaRequired: false,
+  stepUpRequired: false,
+}));
 
 const jsonHeaders = {
   "Cache-Control": "no-store",
@@ -22,27 +44,96 @@ function redirect(response, location) {
   response.end();
 }
 
-function authorizePage(url) {
+function authorizePage(url, challenges, onAuthorizationCode = () => {}) {
   const redirectUri = url.searchParams.get("redirect_uri");
   const state = url.searchParams.get("state");
   if (!redirectUri || !state) return null;
   const callback = new URL(redirectUri);
-  if (
-    callback.protocol !== "kitezh:" ||
-    callback.host !== "oauth" ||
-    callback.pathname !== "/callback"
-  ) {
+  const isAccountCallback =
+    callback.protocol === "kitezh:" &&
+    callback.host === "oauth" &&
+    callback.pathname === "/callback";
+  const isAdminCallback =
+    callback.protocol === "kitezh:" &&
+    callback.host === "admin" &&
+    callback.pathname === "/oauth/callback";
+  const isSocialLinkCallback =
+    callback.protocol === "kitezh:" &&
+    callback.host === "social-link" &&
+    callback.pathname === "/callback";
+  if (!isAccountCallback && !isAdminCallback && !isSocialLinkCallback) {
     return null;
   }
-  callback.searchParams.set("code", randomBytes(18).toString("hex"));
+  const code = randomBytes(18).toString("hex");
+  onAuthorizationCode(code, state);
+  callback.searchParams.set("code", code);
   callback.searchParams.set("state", state);
   const callbackUrl = callback.toString();
+  const challengeId = randomBytes(18).toString("hex");
+  challenges.set(challengeId, { redirectUri, state });
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>Kitezh fixture sign in</title></head>
 <body><main><h1>Kitezh fixture account</h1>
 <p>This deterministic account is used only by native development-build tests.</p>
-<a href="${escapeHtml(callbackUrl)}">Continue with fixture account</a>
+<p><a href="${escapeHtml(callbackUrl)}">Continue with fixture account</a></p>
+<p><a href="/fixture/mfa?challenge=${challengeId}">Continue with MFA and required actions</a></p>
 </main></body></html>`;
+}
+
+function fixtureHtml(response, body, status = 200) {
+  response.writeHead(status, {
+    "Cache-Control": "no-store",
+    "Content-Type": "text/html; charset=utf-8",
+  });
+  response.end(body);
+}
+
+function challengePage(
+  challengeId,
+  { error = "", requiredAction = false } = {},
+) {
+  const heading = requiredAction
+    ? "Update password"
+    : "Two-factor authentication";
+  const label = requiredAction ? "New password" : "Authenticator code";
+  const button = requiredAction ? "Complete required action" : "Verify code";
+  const action = requiredAction ? "required-action" : "mfa";
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>${heading}</title></head>
+<body><main><h1>${heading}</h1>
+${error ? `<p role="alert">${error}</p>` : ""}
+<form action="/fixture/${action}" method="post">
+<input type="hidden" name="challenge" value="${challengeId}">
+<label for="challenge-value">${label}</label>
+<input id="challenge-value" name="value" autocomplete="one-time-code" required>
+<button type="submit">${button}</button>
+</form></main></body></html>`;
+}
+
+async function readForm(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  return new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+}
+
+async function readJson(request) {
+  const chunks = [];
+  for await (const chunk of request) chunks.push(chunk);
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+}
+
+function finishAuthorization(response, challenges, challengeId) {
+  const transaction = challenges.get(challengeId);
+  if (!transaction) {
+    response.writeHead(400, { "Cache-Control": "no-store" });
+    response.end("Invalid or completed fixture challenge");
+    return;
+  }
+  challenges.delete(challengeId);
+  const callback = new URL(transaction.redirectUri);
+  callback.searchParams.set("code", randomBytes(18).toString("hex"));
+  callback.searchParams.set("state", transaction.state);
+  redirect(response, callback.toString());
 }
 
 function escapeHtml(value) {
@@ -53,6 +144,111 @@ function escapeHtml(value) {
 }
 
 export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
+  const fixtureEventSettings = {
+    eventsEnabled: true,
+    adminEventsEnabled: true,
+    adminEventsDetailsEnabled: false,
+    eventsExpirationDays: 30,
+  };
+  const fixtureLoginSettings = {
+    userRegistration: true,
+    forgotPassword: true,
+    rememberMe: false,
+    loginWithEmail: false,
+    verifyEmail: false,
+    sessionTimeoutMinutes: 30,
+    passwordMinimumLength: 12,
+    bruteForceEnabled: true,
+    bruteForceMaxFailures: 5,
+    otpEnabled: true,
+    otpRequired: false,
+    passkeys: false,
+  };
+  const fixtureLocalizationSettings = {
+    internationalizationEnabled: true,
+    defaultLocale: "en",
+    supportedLocales: ["en", "tr"],
+    availableLocales: ["en", "tr"],
+    availableBundles: ["backend", "common"],
+  };
+  const fixtureEmailSettings = {
+    enabled: false,
+    fromAddress: "kitezh@example.test",
+    baseUrl: "http://127.0.0.1:9090",
+    host: "mail.example.test",
+    port: 587,
+    username: "fixture-user",
+    passwordConfigured: true,
+    smtpAuth: true,
+    starttls: true,
+    ssl: false,
+  };
+  const fixtureCibaPolicy = {
+    requestLifespanSeconds: 300,
+    pollingIntervalSeconds: 5,
+    deliveryMode: "poll",
+    userVerification: "required",
+    mfaRequired: false,
+    stepUpRequired: false,
+    stepUpAcr: null,
+  };
+  const fixtureOfflineAccessPolicy = {
+    idleTimeout: "P30D",
+    maxLifespan: null,
+    maxLimited: false,
+    revokedBefore: null,
+  };
+  const fixtureGroupUsers = new Map([
+    [5, { id: 5, username: "fixture-member", enabled: true }],
+  ]);
+  const fixtureAvailableGroupUsers = new Map([
+    [42, { id: 42, username: "fixture-candidate", enabled: true }],
+  ]);
+  const fixtureProfileAttributes = {
+    definitions: [
+      {
+        id: 1,
+        name: "department",
+        displayName: "Department",
+        description: "Your team or department.",
+        type: "STRING",
+        required: false,
+        multivalued: false,
+        minLength: 1,
+        maxLength: 80,
+        pattern: null,
+        enabled: true,
+        displayOrder: 10,
+        builtIn: false,
+      },
+    ],
+    attributes: { department: ["Engineering"] },
+  };
+  const fixtureNotifications = [
+    {
+      id: "notice-1",
+      messageKey: "notificationAccountMfaEnabled",
+      createdAt: "2026-10-17T10:00:00Z",
+      read: false,
+    },
+  ];
+  const fixtureSocialLinks = [
+    {
+      provider: "google",
+      displayName: "Google",
+      iconKey: "google",
+      linked: false,
+      configured: true,
+      enabled: true,
+    },
+  ];
+  const fixtureSocialTransactions = new Map();
+  const fixtureSocialCodes = new Map();
+  const fixturePersonalAccessTokens = [];
+  const authorizationChallenges = new Map();
+  let discoveryMode = "normal";
+  let accountMfaEnabled = false;
+  let recoveryCodesRemaining = 0;
   const routes = new Map([
     [
       "GET /health",
@@ -61,6 +257,16 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
     [
       "GET /.well-known/openid-configuration",
       (_request, response, url) => {
+        if (discoveryMode === "unavailable-once") {
+          discoveryMode = "normal";
+          writeJson(response, 503, { title: "Unavailable" });
+          return;
+        }
+        if (discoveryMode === "timeout-once") {
+          discoveryMode = "normal";
+          void timeoutResponse(new URL("/?delay=15000", "http://fixture"), response);
+          return;
+        }
         const issuer = `http://${url.host}`;
         writeJson(response, 200, {
           issuer,
@@ -71,18 +277,132 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
       },
     ],
     [
+      "POST /fixture/discovery-mode",
+      (_request, response, url) => {
+        const mode = url.searchParams.get("mode");
+        if (mode !== "normal" && mode !== "unavailable-once" && mode !== "timeout-once") {
+          writeJson(response, 400, { title: "Invalid discovery fixture mode" });
+          return;
+        }
+        discoveryMode = mode;
+        writeJson(response, 200, { mode: discoveryMode });
+      },
+    ],
+    [
+      "POST /api/auth/mobile/login/passkey/begin",
+      async (request, response) => {
+        const body = await readJson(request);
+        if (body.username !== "fixture-user") {
+          writeJson(response, 401, { title: "Passkey authentication failed", status: 401 });
+          return;
+        }
+        writeJson(response, 200, {
+          status: "passkey_required",
+          transactionId: "fixture-passkey",
+          publicKey: {
+            challenge: randomBytes(32).toString("base64url"),
+            rpId: "kitezh.onrender.com",
+            timeout: 60000,
+            userVerification: "preferred",
+            allowCredentials: [
+              { type: "public-key", id: randomBytes(24).toString("base64url") },
+            ],
+          },
+        });
+      },
+    ],
+    [
+      "POST /api/auth/mobile/login/fixture-passkey/passkey/verify",
+      (_request, response) => {
+        writeJson(response, 401, { title: "Fixture cannot verify passkey assertions", status: 401 });
+      },
+    ],
+    [
       "GET /oauth2/authorize",
       (_request, response, url) => {
-        const page = authorizePage(url);
+        const page = authorizePage(url, authorizationChallenges, (code, state) => {
+          const transaction = fixtureSocialTransactions.get(state);
+          if (transaction) fixtureSocialCodes.set(code, transaction);
+        });
         if (!page) {
           writeJson(response, 400, { title: "Invalid authorization request" });
           return;
         }
-        response.writeHead(200, {
-          "Cache-Control": "no-store",
-          "Content-Type": "text/html; charset=utf-8",
-        });
-        response.end(page);
+        fixtureHtml(response, page);
+      },
+    ],
+    [
+      "GET /fixture/mfa",
+      (_request, response, url) => {
+        const challengeId = url.searchParams.get("challenge") ?? "";
+        if (!authorizationChallenges.has(challengeId)) {
+          response.writeHead(400, { "Cache-Control": "no-store" });
+          response.end("Invalid fixture challenge");
+          return;
+        }
+        fixtureHtml(response, challengePage(challengeId));
+      },
+    ],
+    [
+      "POST /fixture/mfa",
+      async (request, response) => {
+        const form = await readForm(request);
+        const challengeId = form.get("challenge") ?? "";
+        if (!authorizationChallenges.has(challengeId)) {
+          response.writeHead(400, { "Cache-Control": "no-store" });
+          response.end("Invalid fixture challenge");
+          return;
+        }
+        if (form.get("value") !== "123456") {
+          fixtureHtml(
+            response,
+            challengePage(challengeId, {
+              error: "Enter a valid authenticator code.",
+            }),
+            400,
+          );
+          return;
+        }
+        redirect(response, `/fixture/required-action?challenge=${challengeId}`);
+      },
+    ],
+    [
+      "GET /fixture/required-action",
+      (_request, response, url) => {
+        const challengeId = url.searchParams.get("challenge") ?? "";
+        if (!authorizationChallenges.has(challengeId)) {
+          response.writeHead(400, { "Cache-Control": "no-store" });
+          response.end("Invalid fixture challenge");
+          return;
+        }
+        fixtureHtml(
+          response,
+          challengePage(challengeId, { requiredAction: true }),
+        );
+      },
+    ],
+    [
+      "POST /fixture/required-action",
+      async (request, response) => {
+        const form = await readForm(request);
+        const challengeId = form.get("challenge") ?? "";
+        if (!authorizationChallenges.has(challengeId)) {
+          response.writeHead(400, { "Cache-Control": "no-store" });
+          response.end("Invalid fixture challenge");
+          return;
+        }
+        if (form.get("value") !== "Good") {
+          fixtureHtml(
+            response,
+            challengePage(challengeId, {
+              error: "Password does not meet policy.",
+              requiredAction: true,
+            }),
+            400,
+          );
+          return;
+        }
+        finishAuthorization(response, authorizationChallenges, challengeId);
       },
     ],
     [
@@ -107,11 +427,20 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
     ],
     [
       "POST /oauth2/token",
-      (_request, response) => {
+      async (request, response) => {
+        const chunks = [];
+        for await (const chunk of request) chunks.push(chunk);
+        const form = new URLSearchParams(
+          Buffer.concat(chunks).toString("utf8"),
+        );
+        const tokens =
+          form.get("client_id") === "mobile-admin-console"
+            ? fixtureAdminTokens
+            : fixtureTokens;
         writeJson(response, 200, {
-          access_token: fixtureTokens.accessToken,
-          refresh_token: fixtureTokens.refreshToken,
-          id_token: fixtureTokens.idToken,
+          access_token: tokens.accessToken,
+          refresh_token: tokens.refreshToken,
+          id_token: tokens.idToken,
           token_type: "Bearer",
           expires_in: 300,
         });
@@ -142,6 +471,39 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
       },
     ],
     [
+      "/api/account/profile/attributes",
+      async (request, response) => {
+        if (!bearerIsValid(request, fixtureTokens)) {
+          writeJson(response, 401, { title: "Unauthorized", status: 401 });
+          return;
+        }
+        if (request.method === "GET") {
+          writeJson(response, 200, fixtureProfileAttributes);
+          return;
+        }
+        if (request.method !== "PUT") {
+          writeJson(response, 405, {
+            title: "Method Not Allowed",
+            status: 405,
+          });
+          return;
+        }
+        const chunks = [];
+        for await (const chunk of request) chunks.push(chunk);
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        fixtureProfileAttributes.attributes = body.attributes ?? {};
+        writeJson(response, 200, fixtureProfileAttributes);
+      },
+    ],
+    [
+      "/api/account/profile/avatar",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          avatarUrl: null,
+        });
+      },
+    ],
+    [
       "/api/account/sessions",
       (request, response) => {
         writeAuthorizedJson(request, response, fixtureTokens, {
@@ -150,6 +512,174 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
           totalPages: 0,
           number: 0,
           size: 20,
+        });
+      },
+    ],
+    [
+      "/api/account/applications",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          number: 0,
+          size: 20,
+        });
+      },
+    ],
+    [
+      "/api/account/offline-sessions",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          content: [],
+          totalElements: 0,
+          totalPages: 0,
+          number: 0,
+          size: 20,
+        });
+      },
+    ],
+    [
+      "GET /api/account/notifications",
+      (request, response, url) => {
+        if (!bearerIsValid(request, fixtureTokens)) {
+          writeJson(response, 401, { title: "Unauthorized", status: 401 });
+          return;
+        }
+        const page = Math.max(0, Number(url.searchParams.get("page") ?? 0));
+        const size = Math.max(1, Number(url.searchParams.get("size") ?? 20));
+        const totalPages = Math.ceil(fixtureNotifications.length / size);
+        const content = fixtureNotifications.slice(page * size, (page + 1) * size);
+        writeJson(response, 200, {
+          content,
+          totalElements: fixtureNotifications.length,
+          totalPages,
+          number: page,
+          size,
+        });
+      },
+    ],
+    [
+      "GET /api/account/notifications/unread-count",
+      (request, response) => {
+        if (!bearerIsValid(request, fixtureTokens)) {
+          writeJson(response, 401, { title: "Unauthorized", status: 401 });
+          return;
+        }
+        writeJson(
+          response,
+          200,
+          fixtureNotifications.filter((notification) => !notification.read)
+            .length,
+        );
+      },
+    ],
+    [
+      "GET /api/ciba/requests",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          content: fixtureCibaRequests,
+          totalElements: fixtureCibaRequests.length,
+          totalPages: fixtureCibaRequests.length > 0 ? 1 : 0,
+          number: 0,
+          size: 20,
+        });
+      },
+    ],
+    [
+      "GET /api/account/mfa",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          enabled: accountMfaEnabled,
+          available: true,
+          required: false,
+          issuer: "Kitezh Fixture",
+          algorithm: "SHA1",
+          digits: 6,
+          periodSeconds: 30,
+        });
+      },
+    ],
+    [
+      "POST /api/account/mfa/setup",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          secret: "JBSWY3DPEHPK3PXP",
+          qrCode:
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j3ioAAAAASUVORK5CYII=",
+          algorithm: "SHA1",
+          digits: 6,
+          periodSeconds: 30,
+        });
+      },
+    ],
+    [
+      "POST /api/account/mfa/enable",
+      async (request, response) => {
+        if (!bearerIsValid(request, fixtureTokens)) {
+          writeJson(response, 401, { title: "Unauthorized", status: 401 });
+          return;
+        }
+        const body = await readJson(request);
+        if (body.code !== "123456") {
+          writeJson(response, 400, {
+            title: "Invalid authenticator code",
+            status: 400,
+            violations: [{ field: "code", message: "Enter a valid authenticator code." }],
+          });
+          return;
+        }
+        accountMfaEnabled = true;
+        response.writeHead(204, { "Cache-Control": "no-store" });
+        response.end();
+      },
+    ],
+    [
+      "POST /api/account/mfa/disable",
+      async (request, response) => {
+        if (!bearerIsValid(request, fixtureTokens)) {
+          writeJson(response, 401, { title: "Unauthorized", status: 401 });
+          return;
+        }
+        const body = await readJson(request);
+        if (body.code !== "123456") {
+          writeJson(response, 400, {
+            title: "Invalid authenticator code",
+            status: 400,
+            violations: [{ field: "code", message: "Enter a valid authenticator code." }],
+          });
+          return;
+        }
+        accountMfaEnabled = false;
+        response.writeHead(204, { "Cache-Control": "no-store" });
+        response.end();
+      },
+    ],
+    [
+      "GET /api/account/mfa/recovery-codes",
+      (request, response) => {
+        writeAuthorizedJson(request, response, fixtureTokens, {
+          remaining: recoveryCodesRemaining,
+          warningThreshold: 2,
+        });
+      },
+    ],
+    [
+      "POST /api/account/mfa/recovery-codes",
+      (request, response) => {
+        if (!bearerIsValid(request, fixtureTokens)) {
+          writeJson(response, 401, { title: "Unauthorized", status: 401 });
+          return;
+        }
+        if (!accountMfaEnabled) {
+          writeJson(response, 409, { title: "MFA is not enabled", status: 409 });
+          return;
+        }
+        const recoveryCodes = ["F1XT-URE1", "F1XT-URE2", "F1XT-URE3"];
+        recoveryCodesRemaining = recoveryCodes.length;
+        writeJson(response, 200, {
+          codes: recoveryCodes,
+          remaining: recoveryCodesRemaining,
         });
       },
     ],
@@ -172,6 +702,497 @@ export function createFixtureServer({ host = "127.0.0.1", port = 0 } = {}) {
       request.url ?? "/",
       `http://${request.headers.host ?? host}`,
     );
+    const cibaDecision = url.pathname.match(
+      /^\/api\/ciba\/requests\/([^/]+)\/(approve|deny)$/,
+    );
+    const notificationRead = url.pathname.match(
+      /^\/api\/account\/notifications\/([^/]+)\/read$/,
+    );
+    if (notificationRead && request.method === "PUT") {
+      if (!bearerIsValid(request, fixtureTokens)) {
+        writeJson(response, 401, { title: "Unauthorized", status: 401 });
+        return;
+      }
+      const notification = fixtureNotifications.find(
+        (item) => item.id === decodeURIComponent(notificationRead[1]),
+      );
+      if (!notification) {
+        writeJson(response, 404, { title: "Not Found", status: 404 });
+        return;
+      }
+      notification.read = true;
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+    if (
+      request.method === "GET" &&
+      url.pathname === "/api/account/social-links"
+    ) {
+      writeAuthorizedJson(request, response, fixtureTokens, fixtureSocialLinks);
+      return;
+    }
+    const socialLinkStart = url.pathname.match(
+      /^\/api\/account\/social-links\/([^/]+)\/mobile\/start$/,
+    );
+    if (socialLinkStart && request.method === "POST") {
+      if (!bearerIsValid(request, fixtureTokens)) {
+        writeJson(response, 401, { title: "Unauthorized", status: 401 });
+        return;
+      }
+      const provider = decodeURIComponent(socialLinkStart[1]);
+      const link = fixtureSocialLinks.find((item) => item.provider === provider);
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      if (
+        !link?.configured ||
+        !link.enabled ||
+        typeof body.state !== "string" ||
+        typeof body.codeChallenge !== "string"
+      ) {
+        writeJson(response, 400, {
+          title: "Invalid social-link request",
+          status: 400,
+        });
+        return;
+      }
+      const expiresAt = Date.now() + 5 * 60_000;
+      fixtureSocialTransactions.set(body.state, {
+        provider,
+        codeChallenge: body.codeChallenge,
+        expiresAt,
+      });
+      const authorizationUrl = new URL(
+        "/oauth2/authorize",
+        `http://${url.host}`,
+      );
+      authorizationUrl.searchParams.set("client_id", "mobile-account-console");
+      authorizationUrl.searchParams.set("response_type", "code");
+      authorizationUrl.searchParams.set(
+        "redirect_uri",
+        "kitezh://social-link/callback",
+      );
+      authorizationUrl.searchParams.set("scope", "openid profile");
+      authorizationUrl.searchParams.set("state", body.state);
+      authorizationUrl.searchParams.set("code_challenge", body.codeChallenge);
+      authorizationUrl.searchParams.set("code_challenge_method", "S256");
+      writeJson(response, 200, {
+        authorizationUrl: authorizationUrl.toString(),
+        state: body.state,
+        expiresAt: new Date(expiresAt).toISOString(),
+      });
+      return;
+    }
+    if (
+      request.method === "POST" &&
+      url.pathname === "/api/account/social-links/mobile/complete"
+    ) {
+      if (!bearerIsValid(request, fixtureTokens)) {
+        writeJson(response, 401, { title: "Unauthorized", status: 401 });
+        return;
+      }
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      const transaction = fixtureSocialCodes.get(body.code);
+      const challenge = createHash("sha256")
+        .update(body.codeVerifier ?? "")
+        .digest("base64url");
+      if (
+        !transaction ||
+        transaction.expiresAt <= Date.now() ||
+        transaction.codeChallenge !== challenge
+      ) {
+        writeJson(response, 400, {
+          title: "Invalid social-link callback",
+          status: 400,
+        });
+        return;
+      }
+      fixtureSocialCodes.delete(body.code);
+      const link = fixtureSocialLinks.find(
+        (item) => item.provider === transaction.provider,
+      );
+      if (!link) {
+        writeJson(response, 404, { title: "Provider not found", status: 404 });
+        return;
+      }
+      link.linked = true;
+      writeJson(response, 200, { provider: transaction.provider, linked: true });
+      return;
+    }
+    if (url.pathname === "/api/account/personal-access-tokens") {
+      if (!bearerIsValid(request, fixtureTokens)) {
+        writeJson(response, 401, { title: "Unauthorized", status: 401 });
+        return;
+      }
+      if (request.method === "GET") {
+        writeJson(response, 200, fixturePersonalAccessTokens);
+        return;
+      }
+      if (request.method === "POST") {
+        const chunks = [];
+        for await (const chunk of request) chunks.push(chunk);
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        const token = {
+          id: `fixture-pat-${fixturePersonalAccessTokens.length + 1}`,
+          name: body.name,
+          description: body.description ?? null,
+          scope: "mcp.read",
+          createdAt: new Date().toISOString(),
+          expiresAt: body.expiration === "never" ? null : new Date(Date.now() + 90 * 86_400_000).toISOString(),
+        };
+        fixturePersonalAccessTokens.push(token);
+        writeJson(response, 201, { ...token, token: "fixture-one-time-pat-value" });
+        return;
+      }
+    }
+    const personalAccessTokenId = url.pathname.match(
+      /^\/api\/account\/personal-access-tokens\/([^/]+)$/,
+    );
+    if (personalAccessTokenId && request.method === "DELETE") {
+      if (!bearerIsValid(request, fixtureTokens)) {
+        writeJson(response, 401, { title: "Unauthorized", status: 401 });
+        return;
+      }
+      const index = fixturePersonalAccessTokens.findIndex(
+        (token) => token.id === decodeURIComponent(personalAccessTokenId[1]),
+      );
+      if (index < 0) {
+        writeJson(response, 404, { title: "Not Found", status: 404 });
+        return;
+      }
+      fixturePersonalAccessTokens.splice(index, 1);
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+    const socialLinkDelete = url.pathname.match(
+      /^\/api\/account\/social-links\/([^/]+)$/,
+    );
+    if (socialLinkDelete && request.method === "DELETE") {
+      if (!bearerIsValid(request, fixtureTokens)) {
+        writeJson(response, 401, { title: "Unauthorized", status: 401 });
+        return;
+      }
+      const link = fixtureSocialLinks.find(
+        (item) => item.provider === decodeURIComponent(socialLinkDelete[1]),
+      );
+      if (!link) {
+        writeJson(response, 404, { title: "Provider not found", status: 404 });
+        return;
+      }
+      link.linked = false;
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+    if (url.pathname.startsWith("/api/admin/")) {
+      if (
+        request.headers.authorization !==
+        `Bearer ${fixtureAdminTokens.accessToken}`
+      ) {
+        const status =
+          request.headers.authorization ===
+          `Bearer ${fixtureTokens.accessToken}`
+            ? 403
+            : 401;
+        writeJson(response, status, {
+          title: status === 403 ? "Forbidden" : "Unauthorized",
+          status,
+        });
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/admin/dashboard") {
+        writeJson(response, 200, {
+          clients: 1,
+          users: 2,
+          sessions: 1,
+          consents: 0,
+        });
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/admin/server-info") {
+        const issuer = `http://${url.host}`;
+        writeJson(response, 200, {
+          issuer,
+          discoveryEndpoint: `${issuer}/.well-known/openid-configuration`,
+          authorizationEndpoint: `${issuer}/oauth2/authorize`,
+          tokenEndpoint: `${issuer}/oauth2/token`,
+          introspectionEndpoint: `${issuer}/oauth2/introspect`,
+          revocationEndpoint: `${issuer}/oauth2/revoke`,
+          jwksEndpoint: `${issuer}/oauth2/jwks`,
+          userInfoEndpoint: `${issuer}/userinfo`,
+          endSessionEndpoint: `${issuer}/connect/logout`,
+          sessionTimeout: "PT30M",
+          activeSigningKey: {
+            kid: "fixture-active-key",
+            type: "RSA",
+            algorithm: "RS256",
+            use: "sig",
+            createdAt: "2026-10-17T00:00:00Z",
+          },
+        });
+        return;
+      }
+      if (request.method === "GET" && url.pathname === "/api/admin/whoami") {
+        writeJson(response, 200, {
+          username: "fixture-admin",
+          avatarUrl: null,
+          authorities: ["ROLE_ADMIN"],
+          access: {
+            isAdmin: true,
+            queryClients: true,
+            viewClients: true,
+            manageClients: true,
+            queryUsers: true,
+            viewUsers: true,
+            manageUsers: true,
+            impersonateUsers: true,
+            queryGroups: true,
+            viewGroups: true,
+            manageGroups: true,
+            queryOrganizations: true,
+            viewOrganizations: true,
+            manageOrganizations: true,
+            viewRoles: true,
+            manageRoles: true,
+            viewSessions: true,
+            manageSessions: true,
+            viewConsents: true,
+            manageConsents: true,
+            viewEvents: true,
+            manageEvents: true,
+            viewKeys: true,
+            manageKeys: true,
+          },
+        });
+        return;
+      }
+      if (
+        url.pathname === "/api/admin/settings/login/native" &&
+        (request.method === "GET" || request.method === "PUT")
+      ) {
+        if (request.method === "PUT") {
+          const chunks = [];
+          for await (const chunk of request) chunks.push(chunk);
+          Object.assign(
+            fixtureLoginSettings,
+            JSON.parse(Buffer.concat(chunks).toString("utf8")),
+          );
+        }
+        writeJson(response, 200, fixtureLoginSettings);
+        return;
+      }
+      if (
+        url.pathname === "/api/admin/settings/localization" &&
+        (request.method === "GET" || request.method === "PUT")
+      ) {
+        if (request.method === "PUT") {
+          const chunks = [];
+          for await (const chunk of request) chunks.push(chunk);
+          Object.assign(
+            fixtureLocalizationSettings,
+            JSON.parse(Buffer.concat(chunks).toString("utf8")),
+          );
+        }
+        writeJson(response, 200, fixtureLocalizationSettings);
+        return;
+      }
+      if (
+        url.pathname === "/api/admin/settings/email" &&
+        (request.method === "GET" || request.method === "PUT")
+      ) {
+        if (request.method === "PUT") {
+          const chunks = [];
+          for await (const chunk of request) chunks.push(chunk);
+          const updated = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+          Object.assign(fixtureEmailSettings, updated, {
+            passwordConfigured:
+              updated.password?.length > 0 || fixtureEmailSettings.passwordConfigured,
+          });
+          delete fixtureEmailSettings.password;
+        }
+        writeJson(response, 200, fixtureEmailSettings);
+        return;
+      }
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/admin/settings/email/test"
+      ) {
+        writeJson(response, 200, { accepted: true });
+        return;
+      }
+      if (
+        url.pathname === "/api/admin/settings/ciba-policy" &&
+        (request.method === "GET" || request.method === "PUT")
+      ) {
+        if (request.method === "PUT") {
+          const chunks = [];
+          for await (const chunk of request) chunks.push(chunk);
+          Object.assign(
+            fixtureCibaPolicy,
+            JSON.parse(Buffer.concat(chunks).toString("utf8")),
+          );
+        }
+        writeJson(response, 200, fixtureCibaPolicy);
+        return;
+      }
+      if (url.pathname === "/api/admin/settings/offline-access") {
+        if (request.method === "POST") {
+          fixtureOfflineAccessPolicy.revokedBefore = new Date().toISOString();
+          writeJson(response, 200, fixtureOfflineAccessPolicy);
+          return;
+        }
+        if (request.method === "GET" || request.method === "PUT") {
+          if (request.method === "PUT") {
+            const chunks = [];
+            for await (const chunk of request) chunks.push(chunk);
+            Object.assign(
+              fixtureOfflineAccessPolicy,
+              JSON.parse(Buffer.concat(chunks).toString("utf8")),
+            );
+          }
+          writeJson(response, 200, fixtureOfflineAccessPolicy);
+          return;
+        }
+      }
+      if (
+        request.method === "POST" &&
+        url.pathname === "/api/admin/settings/offline-access/revoke-all"
+      ) {
+        fixtureOfflineAccessPolicy.revokedBefore = new Date().toISOString();
+        writeJson(response, 200, fixtureOfflineAccessPolicy);
+        return;
+      }
+      if (url.pathname === "/api/admin/events/config") {
+        if (request.method === "GET") {
+          writeJson(response, 200, fixtureEventSettings);
+          return;
+        }
+        if (request.method === "PUT") {
+          const chunks = [];
+          for await (const chunk of request) chunks.push(chunk);
+          Object.assign(
+            fixtureEventSettings,
+            JSON.parse(Buffer.concat(chunks).toString("utf8")),
+          );
+          writeJson(response, 200, fixtureEventSettings);
+          return;
+        }
+      }
+      if (request.method === "GET" && url.pathname === "/api/admin/groups") {
+        writeJson(response, 200, {
+          content: [
+            {
+              id: 3,
+              name: "Fixture operators",
+              path: "/Fixture operators",
+              parentId: null,
+              roles: [],
+              effectiveRoles: [],
+              defaultGroup: false,
+              userCount: fixtureGroupUsers.size,
+            },
+          ],
+          number: Number(url.searchParams.get("page") ?? 0),
+          size: Number(url.searchParams.get("size") ?? 10),
+          totalElements: 1,
+          totalPages: 1,
+        });
+        return;
+      }
+      const groupUsersRoute = url.pathname.match(
+        /^\/api\/admin\/groups\/3\/(users|available-users)(?:\/(\d+))?$/,
+      );
+      if (groupUsersRoute) {
+        const [, collection, userId] = groupUsersRoute;
+        if (request.method === "GET" && !userId) {
+          const users =
+            collection === "users"
+              ? fixtureGroupUsers
+              : fixtureAvailableGroupUsers;
+          const content = [...users.values()].filter((user) =>
+            user.username.includes(url.searchParams.get("q") ?? ""),
+          );
+          writeJson(response, 200, {
+            content,
+            number: Number(url.searchParams.get("page") ?? 0),
+            size: Number(url.searchParams.get("size") ?? 10),
+            totalElements: content.length,
+            totalPages: content.length ? 1 : 0,
+          });
+          return;
+        }
+        if (request.method === "POST" && collection === "users" && !userId) {
+          const chunks = [];
+          for await (const chunk of request) chunks.push(chunk);
+          const { userId: addedUserId } = JSON.parse(
+            Buffer.concat(chunks).toString("utf8"),
+          );
+          const user = fixtureAvailableGroupUsers.get(addedUserId);
+          if (!user) {
+            writeJson(response, 404, { title: "Not Found", status: 404 });
+            return;
+          }
+          fixtureAvailableGroupUsers.delete(addedUserId);
+          fixtureGroupUsers.set(addedUserId, user);
+          writeJson(response, 200, {
+            id: 3,
+            name: "Fixture operators",
+            path: "/Fixture operators",
+            parentId: null,
+            roles: [],
+            effectiveRoles: [],
+            defaultGroup: false,
+            userCount: fixtureGroupUsers.size,
+          });
+          return;
+        }
+        if (request.method === "DELETE" && collection === "users" && userId) {
+          const user = fixtureGroupUsers.get(Number(userId));
+          if (!user) {
+            writeJson(response, 404, { title: "Not Found", status: 404 });
+            return;
+          }
+          fixtureGroupUsers.delete(Number(userId));
+          fixtureAvailableGroupUsers.set(Number(userId), user);
+          writeJson(response, 200, {
+            id: 3,
+            name: "Fixture operators",
+            path: "/Fixture operators",
+            parentId: null,
+            roles: [],
+            effectiveRoles: [],
+            defaultGroup: false,
+            userCount: fixtureGroupUsers.size,
+          });
+          return;
+        }
+      }
+      writeJson(response, 404, { title: "Not Found", status: 404 });
+      return;
+    }
+    if (cibaDecision && request.method === "POST") {
+      if (!bearerIsValid(request, fixtureTokens)) {
+        writeJson(response, 401, { title: "Unauthorized", status: 401 });
+        return;
+      }
+      const requestIndex = fixtureCibaRequests.findIndex(
+        (item) =>
+          item.authReqId === cibaDecision[1] &&
+          item.userCode === url.searchParams.get("user_code"),
+      );
+      if (requestIndex < 0) {
+        writeJson(response, 404, { title: "Not Found", status: 404 });
+        return;
+      }
+      fixtureCibaRequests.splice(requestIndex, 1);
+      response.writeHead(204);
+      response.end();
+      return;
+    }
     const handler =
       routes.get(`${request.method} ${url.pathname}`) ??
       routes.get(url.pathname);
@@ -223,7 +1244,10 @@ async function timeoutResponse(url, response) {
   writeJson(response, 504, { title: "Gateway Timeout", status: 504 });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+) {
   const args = new Map();
   for (let index = 2; index < process.argv.length; index += 2)
     args.set(process.argv[index], process.argv[index + 1]);

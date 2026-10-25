@@ -9,6 +9,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=appuser
       - SPRING_LIQUIBASE_ENABLED=false
       - APP_AUTHORIZATIONSERVER_ISSUER=http://127.0.0.1:9090
+      - APP_MCP_RESOURCE_AUDIENCE=${APP_MCP_PUBLIC_URL:-http://localhost:10000/mcp}
     ports:
       - "127.0.0.1:9090:9090"
     depends_on:

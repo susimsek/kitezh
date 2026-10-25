@@ -33,6 +33,7 @@ public final class DefaultClientScopesClientCredentialsConverter
                             new OAuth2ClientCredentialsAuthenticationConverter(),
                             new OAuth2DeviceCodeAuthenticationConverter(),
                             new TokenExchangeAuthenticationConverter(),
+                            new UmaTicketAuthenticationConverter(),
                             new org.springframework.security.oauth2.server.authorization.web
                                     .authentication.OAuth2TokenExchangeAuthenticationConverter()));
 

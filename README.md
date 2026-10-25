@@ -2,23 +2,24 @@
 
 [![Latest release](https://img.shields.io/github/v/release/susimsek/kitezh?label=latest%20release&color=blue)](https://github.com/susimsek/kitezh/releases/latest)
 [![Build Status](https://github.com/susimsek/kitezh/actions/workflows/ci.yml/badge.svg)](https://github.com/susimsek/kitezh/actions/workflows/ci.yml)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=kitezh)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=coverage)](https://sonarcloud.io/summary/new_code?id=kitezh)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=alert_status&branch=main)](https://sonarcloud.io/summary/new_code?id=kitezh&branch=main)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=kitezh&metric=coverage&branch=main)](https://sonarcloud.io/summary/new_code?id=kitezh&branch=main)
 [![Vulnerabilities](https://snyk.io/test/github/susimsek/kitezh/badge.svg)](https://snyk.io/test/github/susimsek/kitezh)
 [![Docker Image Size](https://img.shields.io/docker/image-size/suayb/kitezh/latest?label=Image%20Size)](https://hub.docker.com/r/suayb/kitezh)
 [![Render](https://img.shields.io/badge/Render-Live%20Demo-46E3B7?logo=render&logoColor=white)](https://kitezh.onrender.com)
 [![Grafana](https://img.shields.io/badge/Grafana-Observability-F46800?logo=grafana&logoColor=white)](https://eagerlattice1653.grafana.net/d/spring-auth-prod/kitezh)
 [![Java](https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![GraalVM](https://img.shields.io/badge/GraalVM-25%2B-FF6600?logo=graalvm)](https://www.graalvm.org/)
 [![Maven](https://img.shields.io/badge/Maven-3.9+-C71A36?logo=apache-maven&logoColor=white)](https://maven.apache.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=spring-boot&logoColor=white)](https://spring.io/projects/spring-boot/)
 [![Spring Security](https://img.shields.io/badge/Spring%20Security-Authorization%20Server-6DB33F?logo=springsecurity&logoColor=white)](https://docs.spring.io/spring-security/reference/servlet/oauth2/authorization-server/index.html)
 [![Spring Data JPA](https://img.shields.io/badge/Spring%20Data%20JPA-Persistence-6DB33F?logo=spring&logoColor=white)](https://spring.io/projects/spring-data-jpa/)
+[![Spring AI](https://img.shields.io/badge/Spring%20AI-MCP%20Server-6DB33F?logo=spring&logoColor=white)](https://spring.io/projects/spring-ai)
 [![Next.js](https://img.shields.io/badge/Next.js-16-000000?logo=nextdotjs&logoColor=white)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-Web-61DAFB?logo=react&logoColor=white)](https://react.dev/)
 [![React Native](https://img.shields.io/badge/React%20Native-Mobile-61DAFB?logo=react&logoColor=white)](https://reactnative.dev/)
 [![Electron](https://img.shields.io/badge/Electron-Desktop-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
 [![Liquibase](https://img.shields.io/badge/Liquibase-Migrations-2A62FF?logo=liquibase&logoColor=white)](https://www.liquibase.com/)
-[![GraalVM](https://img.shields.io/badge/GraalVM-25%2B-FF6600?logo=graalvm)](https://www.graalvm.org/)
 [![H2 Database](https://img.shields.io/badge/H2-Database-007396?logo=h2&logoColor=white)](https://www.h2database.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
@@ -49,20 +50,21 @@ Kitezh is a Spring Boot 4.1 + Java 25 identity platform built around the Authori
 13. [OAuth2 and OIDC Endpoints](#oauth2-and-oidc-endpoints)
 14. [Authorization Server Flows](#authorization-server-flows)
 15. [Try with curl](#try-with-curl)
-16. [Client Registration and Seed Data](#client-registration-and-seed-data)
-17. [Database](#database)
-18. [Internationalization](#internationalization)
-19. [Build](#build)
-20. [Performance Tests](#performance-tests)
-21. [Code Quality](#code-quality)
-22. [GraalVM Native Image](#graalvm-native-image)
-23. [Docker Image](#docker-image)
-24. [Kubernetes Health Probe](#kubernetes-health-probe)
-25. [Docker Compose Support](#docker-compose-support)
-26. [Helm](#helm)
-27. [Terraform](#terraform)
-28. [Continuous Integration](#continuous-integration)
-29. [Project Policies](#project-policies)
+16. [Kitezh MCP Server](#kitezh-mcp-server)
+17. [Client Registration and Seed Data](#client-registration-and-seed-data)
+18. [Database](#database)
+19. [Internationalization](#internationalization)
+20. [Build](#build)
+21. [Performance Tests](#performance-tests)
+22. [Code Quality](#code-quality)
+23. [GraalVM Native Image](#graalvm-native-image)
+24. [Docker Image](#docker-image)
+25. [Kubernetes Health Probe](#kubernetes-health-probe)
+26. [Docker Compose Support](#docker-compose-support)
+27. [Helm](#helm)
+28. [Terraform](#terraform)
+29. [Continuous Integration](#continuous-integration)
+30. [Project Policies](#project-policies)
 
 ## Features
 
@@ -75,6 +77,7 @@ Kitezh is a Spring Boot 4.1 + Java 25 identity platform built around the Authori
 - Form login backed by Spring Security and JPA user storage
 - Optional account TOTP MFA with configurable issuer, algorithm, digits, period, clock-drift window, reusable-code policy, recovery codes, and required-action enrollment
 - Built-in Administration and Account consoles using public OIDC clients with Authorization Code + PKCE, refresh tokens, and OIDC logout
+- Separate read-only Kitezh MCP Server with Streamable HTTP, OAuth audience validation, and user-token forwarding to the Admin API
 - H2 in-memory database in PostgreSQL compatibility mode for `dev`
 - H2 web console at `/h2-console` for local `dev`-profile database inspection
 - PostgreSQL support for `prod`
@@ -222,8 +225,8 @@ enabled by default and can be configured with `APP_LOG_SERVER_LEVEL` (`BASIC`, `
 `FULL`), `APP_LOG_SERVER_EXCLUDE_PATHS`, and `APP_LOG_SERVER_FILE_ENABLED`. Set
 `APP_LOG_SERVER_ENABLED=false` to disable it. The `enabled` switch controls whether a handler is
 active; there is no `NONE` level. Shared Zalando-style obfuscation is configured under
-`APP_LOG_OBFUSCATE_HEADERS`, `APP_LOG_OBFUSCATE_BODY_FIELDS`, `APP_LOG_OBFUSCATE_COOKIES`, and
-`APP_LOG_OBFUSCATE_PARAMETERS`, and `APP_LOG_OBFUSCATE_REPLACEMENT`. Query parameters are included
+`APP_LOG_OBFUSCATE_HEADERS`, `APP_LOG_OBFUSCATE_BODY_FIELDS`, `APP_LOG_OBFUSCATE_PARAMETERS`, and
+`APP_LOG_OBFUSCATE_REPLACEMENT`. Query parameters are included
 in logged URIs and sensitive names are replaced with `***`. Outgoing HTTP
 request metadata is disabled by default. For temporary diagnostics, set
 `APP_LOG_CLIENT_ENABLED=true`; this logs method, redacted URI, status, duration, and exceptions
@@ -394,20 +397,20 @@ same-origin `/api/public/desktop-release` endpoint. The backend fetches GitHub R
 once per cache period and returns only allowlisted, versioned platform assets, so browsers do not
 call the GitHub API directly or consume its unauthenticated rate limit. The Electron updater
 continues to use the standard `latest*.yml` manifests; no duplicate binary aliases are published.
-macOS and Windows CI packages remain unsigned until their platform signing credentials are configured;
-Linux packages receive keyless Sigstore bundles in the release workflow.
+macOS, Windows, Android, and iOS release packages use their signing credentials when the complete
+platform key set is configured and continue unsigned when it is absent. Linux desktop packages also
+receive keyless Sigstore bundles through the release workflow.
 The packaged app uses the `kitezh://oauth/callback` protocol and stores console sessions in
 the operating system's protected Electron storage. Release signing, macOS notarization, and
 auto-update publishing require platform certificates and are not part of the unsigned local build.
 
-Signing is controlled by the `MAC_SIGNING_MODE` and `WINDOWS_SIGNING_MODE` variables in the
-`desktop-release` GitHub Environment. Both currently use `unsigned`. To enable macOS signing, set
-`MAC_SIGNING_MODE` to `signed` and configure `MAC_CSC_LINK` and `MAC_CSC_KEY_PASSWORD` environment
-secrets for the base64-encoded Developer ID `.p12`. Optional notarization additionally uses
-`APPLE_API_KEY_BASE64`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`. To enable Windows signing, set
-`WINDOWS_SIGNING_MODE` to `signed` and configure `WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD` for the
-base64-encoded Windows `.pfx`. A signed mode fails early when its required certificate secrets are
-missing; do not put signing material in repository-level secrets.
+Desktop macOS signing uses `MAC_CSC_LINK` and `MAC_CSC_KEY_PASSWORD` for the base64-encoded
+Developer ID `.p12`; notarization runs when `APPLE_API_KEY_BASE64`, `APPLE_API_KEY_ID`, and
+`APPLE_API_ISSUER` are also configured. Windows signing uses `WIN_CSC_LINK` and
+`WIN_CSC_KEY_PASSWORD` for the base64-encoded `.pfx`. Android signing uses the four
+`ANDROID_RELEASE_*` keystore secrets documented in `src/main/mobile/README.md`. iOS signing uses
+the distribution certificate, profile, and team ID secrets documented there. Keep signing material
+in the protected GitHub Environments, never in the repository.
 Linux always validates Debian metadata, publishes `SHA256SUMS`, and creates a Sigstore bundle beside
 each AppImage, Debian, RPM, and Snap package. These keyless signatures are produced by GitHub Actions
 through GitHub OIDC, so no paid certificate or private signing secret is required. Verify a package
@@ -421,8 +424,8 @@ platform manifest, downloads only after the user confirms, and installs only aft
 download succeeds. The release workflow can add detached Ed25519 signatures for `latest*.yml` by
 setting the `UPDATE_MANIFEST_SIGNING_KEY` secret in the `desktop-release` environment; the matching
 public key is derived during the build and bundled in the application. When a signature is present,
-the desktop app verifies it before asking `electron-updater` to check for a package.
-Set `DESKTOP_UPDATE_REQUIRE_SIGNATURE=true` for deployments that must reject unsigned manifests.
+the desktop app verifies it before asking `electron-updater` to check for a package. When no key is
+configured, the app accepts unsigned manifests.
 Failed signature, download, or installation preparation leaves the current installation in place.
 Before installing on supported auto-update targets, the app creates a protected backup of the
 current macOS app bundle, Windows installation directory, or Linux AppImage. A detached watchdog
@@ -445,6 +448,8 @@ native migration scope, platform boundaries, acceptance states, and delivery ord
 | Account        | `/account` | `account-console` | `account-api` | Authenticated users, including `admin/admin`, `user/user`, `user2/user2`, `user3/user3`, `user4/user4`, `user5/user5`, and `user6/user6` |
 
 The authorization server browser session provides SSO between the login screen and the console clients. The Admin Console includes client, client-scope, user, role, session, consent, signing-key, event, and server-information screens. The Account Console provides personal information, password, TOTP MFA, and one-time recovery-code security, authorized applications, and session-management screens.
+
+To connect an MCP client, sign in to the Account Console with `admin/admin` or `user/user`, open **Security → Personal access tokens**, create a token with **Never expires**, and copy its value when it is shown. The value is shown only once; keep it in a local secret or environment variable and never commit it.
 
 The registered redirect and post-logout redirect URIs are seeded for `localhost:9090` and `https://kitezh.local`. When deploying elsewhere, set `app.authorization-server.issuer` (or `APP_AUTHORIZATIONSERVER_ISSUER`) to the public address and register matching client redirect URIs.
 
@@ -943,6 +948,12 @@ Check readiness:
 ```bash
 curl http://127.0.0.1:9090/actuator/health/readiness
 ```
+
+## Kitezh MCP Server
+
+Kitezh MCP Server is a separately deployed, read-only Streamable HTTP service that lets AI clients access Kitezh administration tools with the user's authorization.
+
+See the [MCP Server README](mcp/README.md) for client setup, authentication, and deployment instructions.
 
 ## Client Registration and Seed Data
 

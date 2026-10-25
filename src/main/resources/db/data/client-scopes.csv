@@ -4,5 +4,7 @@ scope-profile;profile;Profile;Basic user profile claims.;true;false;;true;false;
 scope-user-read;user.read;User read;Read user information.;true;false;;true;false;groups;true;system;system
 scope-user-write;user.write;User write;Update user information.;true;false;;true;false;groups;true;system;system
 scope-admin-api;admin-api;Admin API;Access the administration API.;true;false;;true;true;groups;true;system;system
+scope-mcp-read;mcp.read;Kitezh MCP read;Allow read-only access through the Kitezh MCP server.;true;false;;true;false;groups;true;system;system
+scope-mcp-write;mcp.write;Kitezh MCP write;Allow approved write operations through the Kitezh MCP server.;true;false;;true;false;groups;true;system;system
 scope-account-api;account-api;Account API;Access the account API.;true;false;;true;false;groups;true;system;system
 scope-email;email;Email;Email address and verification status.;true;false;;true;false;groups;true;system;system

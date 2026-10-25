@@ -2,9 +2,13 @@ package io.github.susimsek.kitezh.mapper;
 
 import io.github.susimsek.kitezh.config.security.SecurityJsonMapper;
 import io.github.susimsek.kitezh.domain.AuthorizationConsentId;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -87,10 +91,30 @@ public class AuthorizationServerMapperSupport {
             return null;
         }
         try {
-            return securityJsonMapper.delegate().writeValueAsString(value);
+            return securityJsonMapper.delegate().writeValueAsString(normalizeCollections(value));
         } catch (JacksonException ex) {
             throw new IllegalStateException("Failed to serialize authorization server value", ex);
         }
+    }
+
+    private static Object normalizeCollections(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> normalized = new LinkedHashMap<>();
+            map.forEach(
+                    (key, nestedValue) -> normalized.put(key, normalizeCollections(nestedValue)));
+            return normalized;
+        }
+        if (value instanceof Set<?> set) {
+            List<Object> normalized = new ArrayList<>(set.size());
+            set.forEach(item -> normalized.add(normalizeCollections(item)));
+            return normalized;
+        }
+        if (value instanceof Collection<?> collection) {
+            List<Object> normalized = new ArrayList<>(collection.size());
+            collection.forEach(item -> normalized.add(normalizeCollections(item)));
+            return normalized;
+        }
+        return value;
     }
 
     public Map<String, Object> readMap(String value) {

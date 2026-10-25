@@ -8,7 +8,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
@@ -18,12 +18,28 @@ import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing, typography } from "@/theme/tokens";
 import { useMobileUpdates } from "@/updates/MobileUpdateProvider";
+import { resetSettingsPreferences } from "@/preferences/settings-preferences";
 
 export default function SettingsScreen() {
-  const { dictionary, locale, reset: resetLocale, setLocale } = useLocale();
-  const { mode, palette, reset: resetTheme, setMode } = useTheme();
+  const {
+    dictionary,
+    locale,
+    reset: resetLocale,
+    saving: savingLocale,
+    setLocale,
+    storageError: localeStorageError,
+  } = useLocale();
+  const {
+    mode,
+    palette,
+    reset: resetTheme,
+    saving: savingTheme,
+    setMode,
+    storageError: themeStorageError,
+  } = useTheme();
   const { session } = useMobileAuth();
   const [resetting, setResetting] = useState(false);
+  const resettingRef = useRef(false);
   const {
     checked,
     checking,
@@ -38,19 +54,27 @@ export default function SettingsScreen() {
   } = useMobileUpdates();
 
   const resetDefaults = async () => {
-    if (resetting) return;
+    if (resettingRef.current) return;
+    resettingRef.current = true;
     setResetting(true);
     try {
-      await Promise.all([resetLocale(), resetTheme()]);
+      await resetSettingsPreferences(
+        { reset: resetLocale, restore: () => setLocale(locale) },
+        { reset: resetTheme, restore: () => setMode(mode) },
+      );
     } catch {
       // Keep the native settings screen usable when secure storage is unavailable.
     } finally {
+      resettingRef.current = false;
       setResetting(false);
     }
   };
+  const preferencesBusy = resetting || savingLocale || savingTheme;
+  const preferenceStorageError = localeStorageError || themeStorageError;
 
   return (
     <SafeAreaView
+      testID="settings-screen"
       style={[styles.safeArea, { backgroundColor: palette.background }]}
     >
       <View style={styles.screen}>
@@ -62,7 +86,13 @@ export default function SettingsScreen() {
             <Pressable
               accessibilityLabel={dictionary.back}
               accessibilityRole="button"
-              onPress={() => router.back()}
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace(session ? "/account" : "/");
+                }
+              }}
               style={[styles.back, { backgroundColor: palette.surfaceMuted }]}
             >
               <AppIcon
@@ -77,6 +107,30 @@ export default function SettingsScreen() {
             </Text>
           </View>
 
+          {session ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push("/notifications")}
+              style={[
+                styles.notificationLink,
+                {
+                  backgroundColor: palette.surface,
+                  borderColor: palette.border,
+                },
+              ]}
+              testID="settings-notifications"
+            >
+              <AppIcon name="bell" size={18} color={palette.primary} />
+              <Text style={{ color: palette.text, fontWeight: "700" }}>
+                {dictionary.notificationsTitle}
+              </Text>
+              <Text style={{ color: palette.textMuted, flex: 1 }}>
+                {dictionary.notificationsDescription}
+              </Text>
+              <AppIcon name="arrowRight" size={16} color={palette.textMuted} />
+            </Pressable>
+          ) : null}
+
           <SectionHeading
             icon="globe"
             label={dictionary.language}
@@ -87,25 +141,44 @@ export default function SettingsScreen() {
               styles.card,
               { backgroundColor: palette.surface, borderColor: palette.border },
             ]}
+            accessibilityRole="radiogroup"
+            accessibilityLabel={dictionary.language}
           >
+            {preferenceStorageError ? (
+              <Text
+                accessibilityRole="alert"
+                style={[styles.preferenceError, { color: palette.danger }]}
+              >
+                {dictionary.settingsPreferenceSaveError}
+              </Text>
+            ) : null}
             <Text style={[styles.cardTitle, { color: palette.textMuted }]}>
               {dictionary.systemLanguage}
             </Text>
             <Option
               label={dictionary.system}
+              testID="settings-locale-system"
               selected={locale === "system"}
+              busy={savingLocale && locale === "system"}
+              disabled={preferencesBusy}
               onPress={() => setLocale("system")}
               palette={palette}
             />
             <Option
               label={dictionary.english}
+              testID="settings-locale-english"
               selected={locale === "en"}
+              busy={savingLocale && locale === "en"}
+              disabled={preferencesBusy}
               onPress={() => setLocale("en")}
               palette={palette}
             />
             <Option
               label={dictionary.turkish}
+              testID="settings-locale-turkish"
               selected={locale === "tr"}
+              busy={savingLocale && locale === "tr"}
+              disabled={preferencesBusy}
               onPress={() => setLocale("tr")}
               palette={palette}
             />
@@ -121,25 +194,36 @@ export default function SettingsScreen() {
               styles.card,
               { backgroundColor: palette.surface, borderColor: palette.border },
             ]}
+            accessibilityRole="radiogroup"
+            accessibilityLabel={dictionary.theme}
           >
             <Text style={[styles.cardTitle, { color: palette.textMuted }]}>
               {dictionary.theme}
             </Text>
             <Option
               label={dictionary.system}
+              testID="settings-theme-system"
               selected={mode === "system"}
+              busy={savingTheme && mode === "system"}
+              disabled={preferencesBusy}
               onPress={() => setMode("system")}
               palette={palette}
             />
             <Option
               label={dictionary.light}
+              testID="settings-theme-light"
               selected={mode === "light"}
+              busy={savingTheme && mode === "light"}
+              disabled={preferencesBusy}
               onPress={() => setMode("light")}
               palette={palette}
             />
             <Option
               label={dictionary.dark}
+              testID="settings-theme-dark"
               selected={mode === "dark"}
+              busy={savingTheme && mode === "dark"}
+              disabled={preferencesBusy}
               onPress={() => setMode("dark")}
               palette={palette}
             />
@@ -305,22 +389,37 @@ function UpdateButton({
 }
 
 function Option({
+  busy,
+  disabled,
   label,
   onPress,
   palette,
   selected,
+  testID,
 }: Readonly<{
   label: string;
+  busy: boolean;
+  disabled: boolean;
   onPress: () => void;
   palette: ReturnType<typeof useTheme>["palette"];
   selected: boolean;
+  testID: string;
 }>) {
   return (
     <Pressable
+      accessibilityLabel={label}
       accessibilityRole="radio"
-      accessibilityState={{ selected }}
+      accessibilityState={{ busy, disabled, selected }}
+      disabled={disabled}
       onPress={onPress}
-      style={[styles.option, { borderTopColor: palette.border }]}
+      testID={testID}
+      style={[
+        styles.option,
+        {
+          borderTopColor: palette.border,
+          opacity: disabled && !busy ? 0.55 : 1,
+        },
+      ]}
     >
       <Text style={[styles.optionLabel, { color: palette.text }]}>{label}</Text>
       <View
@@ -332,7 +431,9 @@ function Option({
           },
         ]}
       >
-        {selected ? (
+        {busy ? (
+          <ActivityIndicator color={palette.onPrimary} size="small" />
+        ) : selected ? (
           <View
             style={[styles.radioDot, { backgroundColor: palette.onPrimary }]}
           />
@@ -353,12 +454,22 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     minHeight: 48,
   },
+  notificationLink: {
+    alignItems: "center",
+    borderRadius: radii.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: spacing.sm,
+    minHeight: 56,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
   back: {
     alignItems: "center",
     borderRadius: radii.pill,
-    height: 40,
+    height: 44,
     justifyContent: "center",
-    width: 40,
+    width: 44,
   },
   title: { fontSize: typography.pageTitle, fontWeight: "700" },
   sectionHeading: {
@@ -375,7 +486,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 30,
   },
-  sectionTitle: { fontSize: 17, fontWeight: "700" },
+  sectionTitle: { fontSize: 18, fontWeight: "700" },
   versionRow: {
     alignItems: "center",
     flexDirection: "row",
@@ -384,6 +495,12 @@ const styles = StyleSheet.create({
   },
   versionValue: { fontSize: 15, fontWeight: "600" },
   updateMessage: { fontSize: 14, lineHeight: 20, marginBottom: spacing.sm },
+  preferenceError: {
+    fontSize: 13,
+    lineHeight: 19,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+  },
   updateButton: {
     alignItems: "center",
     borderRadius: radii.md,
@@ -391,7 +508,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: "center",
     marginTop: spacing.sm,
-    minHeight: 46,
+    minHeight: 48,
     paddingHorizontal: spacing.md,
   },
   updateButtonText: { fontSize: 15, fontWeight: "700" },

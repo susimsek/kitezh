@@ -28,11 +28,14 @@ export function resolveAuthorizationServerIssuer(
   if (!isDevelopmentBuild) {
     throw new Error("authorization_server_issuer_override_not_allowed");
   }
-  if (
-    url.protocol !== "http:" ||
-    !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) ||
-    url.port !== "9090"
-  ) {
+  const isLocalDevelopmentIssuer =
+    url.protocol === "http:" &&
+    ((["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) &&
+      ["9090", "8080"].includes(url.port)) ||
+      (url.hostname === "10.0.2.2" &&
+        Number(url.port) >= 8080 &&
+        Number(url.port) <= 8099));
+  if (!isLocalDevelopmentIssuer) {
     throw new Error("authorization_server_issuer_invalid");
   }
   return url.origin;

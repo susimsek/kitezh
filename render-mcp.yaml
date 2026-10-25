@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: kitezh-mcp
+    runtime: image
+    plan: free
+    region: frankfurt
+    autoDeploy: false
+    image:
+      url: docker.io/suayb/kitezh-mcp:latest
+    healthCheckPath: /actuator/health/readiness
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SERVER_PORT
+        value: "10000"
+      - key: OTEL_SERVICE_NAME
+        value: kitezh-mcp
+      - key: APP_AUTHORIZATIONSERVER_ISSUER
+        value: https://kitezh.onrender.com
+      - key: APP_SECURITY_AUDIENCE
+        value: https://kitezh-mcp.onrender.com/mcp
+      - key: APP_API_BASE_URL
+        value: https://kitezh.onrender.com
+      - key: APP_MCP_PUBLIC_URL
+        value: https://kitezh-mcp.onrender.com/mcp
+      - key: APP_MCP_READ_ONLY
+        value: "true"
+      - key: MANAGEMENT_OPENTELEMETRY_ENABLED
+        value: "false"
+      - key: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
+        value: http://localhost:4318/v1/traces
+      - key: MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT
+        value: http://localhost:4318/v1/logs
+      - key: MANAGEMENT_TRACING_EXPORT_ENABLED
+        value: "false"
+      - key: MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED
+        value: "false"
+      - key: MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED
+        value: "false"
+      - key: MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED
+        value: "true"
+      - key: MANAGEMENT_OTLP_METRICS_EXPORT_URL
+        value: https://otlp-gateway-prod-eu-west-2.grafana.net/otlp/v1/metrics
+      - key: MANAGEMENT_OTLP_METRICS_EXPORT_HEADERS_AUTHORIZATION
+        sync: false

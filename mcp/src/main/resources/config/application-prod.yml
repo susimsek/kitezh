@@ -1,0 +1,24 @@
+server:
+  shutdown: graceful
+
+app:
+  authorization-server:
+    issuer: ${APP_AUTHORIZATIONSERVER_ISSUER:https://kitezh.onrender.com}
+
+management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        kitezh_mcp_tool_call_duration_seconds: true
+        kitezh_mcp_kitezh_api_request_duration_seconds: true
+        mcp_server_operation_duration_seconds: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+      slo:
+        http.server.requests: 250ms,1s,5s
+
+logging:
+  level:
+    root: INFO
+    io.github.susimsek.kitezh.mcp: INFO

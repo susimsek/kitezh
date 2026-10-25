@@ -50,14 +50,15 @@ function safeReleasePageUrl(value: unknown) {
   return RELEASES_PAGE_URL;
 }
 
-function safeAssetUrl(value: unknown) {
+function safeAssetUrl(value: unknown, tag: string, assetName: string) {
   if (typeof value !== "string") return null;
   try {
     const url = new URL(value);
     if (
       url.protocol === "https:" &&
       url.hostname === "github.com" &&
-      url.pathname.startsWith("/susimsek/kitezh/releases/download/")
+      url.pathname ===
+        `/susimsek/kitezh/releases/download/${tag}/${assetName}`
     ) {
       return url.toString();
     }
@@ -93,7 +94,7 @@ export function parseLatestRelease(
         ];
   let asset: MobileReleaseAsset | null = null;
   for (const [key, name] of candidates) {
-    const url = safeAssetUrl(payload.assets[key]);
+    const url = safeAssetUrl(payload.assets[key], payload.tag, name);
     if (url) {
       asset = { name, url };
       break;

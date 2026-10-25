@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.dto.admin.AdminClientRequestDTO;
 import io.github.susimsek.kitezh.security.AuthorizationGrantTypes;
+import io.github.susimsek.kitezh.validation.validator.AdminClientConfigurationValidator;
 import java.time.Duration;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -207,6 +208,23 @@ class AdminClientConfigurationValidatorTest {
     }
 
     @Test
+    void rejectsAuthorizationCodeWhenRedirectUrisAreNull() {
+        ConstraintContextFixture context = new ConstraintContextFixture();
+
+        boolean valid =
+                validator.isValid(
+                        request(
+                                Set.of(ClientAuthenticationMethod.CLIENT_SECRET_BASIC.getValue()),
+                                Set.of(AuthorizationGrantType.AUTHORIZATION_CODE.getValue()),
+                                null,
+                                false),
+                        context.context);
+
+        assertThat(valid).isFalse();
+        assertThat(context.fields()).containsExactly("redirectUris");
+    }
+
+    @Test
     void rejectsPublicAuthorizationCodeClientWithoutPkce() {
         ConstraintContextFixture context = new ConstraintContextFixture();
 
@@ -358,6 +376,124 @@ class AdminClientConfigurationValidatorTest {
                         "{app.api.problem.violation.selection}",
                         "{app.api.problem.violation.required}",
                         "{app.api.problem.violation.selection}");
+    }
+
+    @Test
+    void validatesOptionalCollectionsTlsCertificateAndPartialPrivateKeySettings() {
+        ConstraintContextFixture missingGrantsContext = new ConstraintContextFixture();
+        assertThat(
+                        validator.isValid(
+                                new AdminClientRequestDTO(
+                                        "client",
+                                        "Client",
+                                        Set.of(
+                                                ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+                                                        .getValue()),
+                                        null,
+                                        Set.of(),
+                                        Set.of(),
+                                        Set.of("openid"),
+                                        false,
+                                        false,
+                                        Duration.ofMinutes(5),
+                                        Duration.ofMinutes(5),
+                                        Duration.ofHours(1)),
+                                missingGrantsContext.context))
+                .isTrue();
+
+        ConstraintContextFixture tlsContext = new ConstraintContextFixture();
+        AdminClientRequestDTO tlsRequest =
+                new AdminClientRequestDTO(
+                        "client",
+                        "Client",
+                        Set.of(ClientAuthenticationMethod.TLS_CLIENT_AUTH.getValue()),
+                        Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue()),
+                        Set.of(),
+                        Set.of(),
+                        Set.of("openid"),
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        Set.of("RS256"),
+                        null,
+                        null,
+                        null,
+                        Duration.ofMinutes(5),
+                        Duration.ofMinutes(5),
+                        Duration.ofHours(1),
+                        false,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "CN=client",
+                        null);
+        assertThat(validator.isValid(tlsRequest, tlsContext.context)).isTrue();
+
+        ConstraintContextFixture partialPrivateKeyContext = new ConstraintContextFixture();
+        AdminClientRequestDTO partialPrivateKeyRequest =
+                new AdminClientRequestDTO(
+                        "client",
+                        "Client",
+                        Set.of(ClientAuthenticationMethod.PRIVATE_KEY_JWT.getValue()),
+                        Set.of(AuthorizationGrantType.CLIENT_CREDENTIALS.getValue()),
+                        Set.of(),
+                        Set.of(),
+                        Set.of("openid"),
+                        false,
+                        false,
+                        false,
+                        false,
+                        false,
+                        Set.of("RS256"),
+                        null,
+                        null,
+                        null,
+                        Duration.ofMinutes(5),
+                        Duration.ofMinutes(5),
+                        Duration.ofHours(1),
+                        false,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "https://example.test/jwks",
+                        " ",
+                        null,
+                        null);
+        assertThat(validator.isValid(partialPrivateKeyRequest, partialPrivateKeyContext.context))
+                .isFalse();
+        assertThat(partialPrivateKeyContext.fields())
+                .containsExactly("clientAuthenticationMethods");
+
+        ConstraintContextFixture combinedMethodsContext = new ConstraintContextFixture();
+        assertThat(
+                        validator.isValid(
+                                request(
+                                        Set.of(
+                                                ClientAuthenticationMethod.CLIENT_SECRET_BASIC
+                                                        .getValue(),
+                                                ClientAuthenticationMethod.CLIENT_SECRET_POST
+                                                        .getValue()),
+                                        Set.of(
+                                                AuthorizationGrantType.CLIENT_CREDENTIALS
+                                                        .getValue()),
+                                        Set.of(),
+                                        false),
+                                combinedMethodsContext.context))
+                .isTrue();
     }
 
     private static AdminClientRequestDTO request(

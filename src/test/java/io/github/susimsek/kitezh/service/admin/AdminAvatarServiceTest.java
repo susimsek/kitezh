@@ -164,6 +164,40 @@ class AdminAvatarServiceTest {
     }
 
     @Test
+    void rejectsAvatarWhenOnlyHeightOrPixelCountExceedsTheLimit() throws Exception {
+        UserEntity user = new UserEntity();
+        user.setId(5L);
+        when(adminUserService.requireManageableUser(5L, "admin")).thenReturn(user);
+
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .updateAvatar(
+                                                5L,
+                                                new MockMultipartFile(
+                                                        "file",
+                                                        "tall.png",
+                                                        "image/png",
+                                                        image("png", 1, 5000)),
+                                                "admin"))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Avatar dimensions must not exceed 4 megapixels");
+        assertThatThrownBy(
+                        () ->
+                                service()
+                                        .updateAvatar(
+                                                5L,
+                                                new MockMultipartFile(
+                                                        "file",
+                                                        "pixels.png",
+                                                        "image/png",
+                                                        image("png", 2001, 2000)),
+                                                "admin"))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Avatar dimensions must not exceed 4 megapixels");
+    }
+
+    @Test
     void rejectsUnsupportedImageFormat() {
         UserEntity user = new UserEntity();
         user.setId(5L);
@@ -203,8 +237,16 @@ class AdminAvatarServiceTest {
         Object first = constructor.newInstance(new byte[] {1, 2}, "image/png");
         Object equal = constructor.newInstance(new byte[] {1, 2}, "image/png");
         Object different = constructor.newInstance(new byte[] {2}, "image/png");
+        Object differentType = constructor.newInstance(new byte[] {1, 2}, "image/jpeg");
 
-        assertThat(first).isEqualTo(equal).isNotEqualTo(different).hasSameHashCodeAs(equal);
+        assertThat(first)
+                .isEqualTo(first)
+                .isEqualTo(equal)
+                .isNotEqualTo(different)
+                .isNotEqualTo(differentType)
+                .isNotEqualTo("not an avatar")
+                .isNotEqualTo(null)
+                .hasSameHashCodeAs(equal);
         assertThat(first.toString()).contains("image/png", "[1, 2]");
     }
 

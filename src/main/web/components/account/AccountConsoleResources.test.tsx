@@ -6,11 +6,14 @@ import { accountRequest } from "@/lib/account-api";
 import { StoreProvider } from "@/store/StoreProvider";
 
 import { AccountApplications } from "./AccountApplications";
+import { AccountPasswordForm } from "./AccountPasswordForm";
 import { AccountProfileForm } from "./AccountProfileForm";
 import { AccountSessions } from "./AccountSessions";
 
 const mockAccountRequest = accountRequest as jest.MockedFunction<typeof accountRequest>;
 const mockLogout = jest.fn();
+const mockAddAlert = jest.fn();
+const mockAddError = jest.fn();
 jest.mock("@/routing/navigation", () => ({
   usePathname: () => window.location.pathname,
 }));
@@ -38,8 +41,8 @@ jest.mock("./AccountAuthProvider", () => ({
 }));
 jest.mock("@/components/auth/ConsoleAlerts", () => ({
   useConsoleAlerts: () => ({
-    addAlert: jest.fn(),
-    addError: jest.fn(),
+    addAlert: mockAddAlert,
+    addError: mockAddError,
   }),
 }));
 
@@ -95,9 +98,111 @@ describe("Account console resources", () => {
       ).not.toBeInTheDocument();
     },
   );
+
+  it("maps password field failures and clears errors when the form is cancelled", async () => {
+    mockAccountRequest.mockResolvedValueOnce({
+      status: 400,
+      data: {
+        violations: [{ field: "currentPassword" }, { field: "newPassword" }],
+      },
+    } as never);
+
+    renderWithStore(<AccountPasswordForm dictionary={dictionary} />);
+    fireEvent.change(screen.getByLabelText(/Current password/), {
+      target: { value: "old-password" },
+    });
+    fireEvent.change(screen.getByLabelText(/New password/), {
+      target: { value: "a-different-long-password" },
+    });
+    fireEvent.change(screen.getByLabelText(/Confirm.*password/i), {
+      target: { value: "a-different-long-password" },
+    });
+    const save = screen.getByRole("button", { name: dictionary.account.common.save });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      dictionary.account.common.operationError,
+    );
+    expect(screen.getByText(dictionary.account.validation.currentPassword)).toBeVisible();
+    expect(screen.getByText(dictionary.account.validation.password)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: dictionary.account.common.cancel }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(screen.getByLabelText(/Current password/)).toHaveValue("");
+    expect(screen.getByLabelText(/New password/)).toHaveValue("");
+  });
+
+  it("saves a new password and resets the form after success", async () => {
+    mockAccountRequest.mockResolvedValueOnce({ status: 204, data: null } as never);
+    renderWithStore(<AccountPasswordForm dictionary={dictionary} />);
+    fireEvent.change(screen.getByLabelText(/Current password/), {
+      target: { value: "old-password" },
+    });
+    fireEvent.change(screen.getByLabelText(/New password/), {
+      target: { value: "a-different-long-password" },
+    });
+    fireEvent.change(screen.getByLabelText(/Confirm.*password/i), {
+      target: { value: "a-different-long-password" },
+    });
+    const save = screen.getByRole("button", { name: dictionary.account.common.save });
+    await waitFor(() => expect(save).toBeEnabled());
+    fireEvent.click(save);
+
+    await waitFor(() =>
+      expect(mockAccountRequest).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({ method: "PUT", url: "/api/account/password" }),
+      ),
+    );
+    expect(mockAddAlert).toHaveBeenCalledWith(dictionary.account.security.saved);
+    expect(screen.getByLabelText(/Current password/)).toHaveValue("");
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     document.documentElement.lang = "en";
+  });
+
+  it("keeps the current login and reports an error when signing out all sessions fails", async () => {
+    mockAccountRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return {
+          status: 200,
+          data: {
+            content: [
+              {
+                id: "sid-current",
+                createdAt: "2026-08-23T10:00:00Z",
+                lastAccessedAt: "2026-08-23T10:30:00Z",
+                expiresAt: "2026-08-23T11:00:00Z",
+                current: true,
+                clients: [],
+              },
+            ],
+            totalPages: 1,
+            totalElements: 1,
+          },
+        } as never;
+      }
+      throw new Error("session service unavailable");
+    });
+
+    renderWithStore(<AccountSessions dictionary={dictionary} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: dictionary.account.sessions.signOutAll }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.account.sessions.signOutAll,
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.account.common.operationError),
+    );
+    expect(mockLogout).not.toHaveBeenCalled();
   });
 
   it("shows current and remote sessions with client context and confirms sign out", async () => {
@@ -216,6 +321,7 @@ describe("Account console resources", () => {
   });
 
   it("moves back a page after removing its last session and handles failures", async () => {
+    window.history.replaceState({}, "", "/account/sessions?page=1");
     mockAccountRequest.mockImplementation(async (_token, config) => {
       if (!config.method) {
         return {
@@ -300,6 +406,139 @@ describe("Account console resources", () => {
     );
   });
 
+  it("shows empty applications and reports a failed consent revocation", async () => {
+    mockAccountRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return {
+          status: 200,
+          data: {
+            content: [],
+            totalPages: 0,
+            totalElements: 0,
+          },
+        } as never;
+      }
+      throw new Error("consent revocation failed");
+    });
+
+    const view = renderWithStore(<AccountApplications dictionary={dictionary} />);
+    expect(await screen.findByText(dictionary.account.common.empty)).toBeVisible();
+    view.unmount();
+
+    mockAccountRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return {
+          status: 200,
+          data: {
+            content: [
+              {
+                clientId: "web-client",
+                clientName: "Web Client",
+                scopes: [],
+                createdAt: "2026-08-20T10:00:00Z",
+                updatedAt: "2026-08-21T10:00:00Z",
+              },
+            ],
+            totalPages: 1,
+            totalElements: 1,
+          },
+        } as never;
+      }
+      throw new Error("consent revocation failed");
+    });
+    renderWithStore(<AccountApplications dictionary={dictionary} />);
+    expect(await screen.findByText("Web Client")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: dictionary.account.applications.revoke }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.account.applications.revoke,
+      }),
+    );
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.account.common.operationError),
+    );
+  });
+
+  it("returns to the previous page after revoking its final application and session", async () => {
+    window.history.replaceState({}, "", "/account/applications?page=1");
+    mockAccountRequest.mockImplementation(async (_token, config) => {
+      if (config.url?.includes("/applications") && !config.method) {
+        return {
+          status: 200,
+          data: {
+            content: [
+              {
+                clientId: "web-client",
+                clientName: "Web Client",
+                scopes: [],
+                createdAt: "2026-08-20T10:00:00Z",
+                updatedAt: "2026-08-21T10:00:00Z",
+              },
+            ],
+            totalPages: 2,
+            totalElements: 11,
+          },
+        } as never;
+      }
+      return { status: 204, data: null } as never;
+    });
+
+    const view = renderWithStore(<AccountApplications dictionary={dictionary} />);
+    expect(await screen.findByText("Web Client")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: dictionary.account.applications.revoke }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.account.applications.revoke,
+      }),
+    );
+    await waitFor(() =>
+      expect(mockAccountRequest).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({ url: "/api/account/applications?page=0&size=10" }),
+      ),
+    );
+    view.unmount();
+
+    window.history.replaceState({}, "", "/account/sessions?page=1");
+    mockAccountRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return {
+          status: 200,
+          data: {
+            content: [
+              {
+                id: "sid-other",
+                createdAt: "2026-08-22T10:00:00Z",
+                lastAccessedAt: "2026-08-22T10:30:00Z",
+                expiresAt: "2026-08-24T11:00:00Z",
+                current: false,
+                clients: [],
+              },
+            ],
+            totalPages: 2,
+            totalElements: 11,
+          },
+        } as never;
+      }
+      return { status: 204, data: null } as never;
+    });
+
+    renderWithStore(<AccountSessions dictionary={dictionary} />);
+    expect(await screen.findByText("sid-other")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: dictionary.account.sessions.signOut }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.account.sessions.signOut,
+      }),
+    );
+    await waitFor(() =>
+      expect(mockAccountRequest).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({ url: "/api/account/sessions?page=0&size=10" }),
+      ),
+    );
+  });
+
   it("validates, uploads, and removes the account avatar", async () => {
     mockAccountRequest.mockImplementation(async (_token, config) => {
       if (config.url === "/api/account/profile") {
@@ -361,6 +600,51 @@ describe("Account console resources", () => {
         url: "/api/account/profile/avatar",
       }),
     );
+  });
+
+  it("reports avatar upload and removal failures", async () => {
+    mockAccountRequest.mockImplementation(async (_token, config) => {
+      if (config.url === "/api/account/profile") {
+        return {
+          status: 200,
+          data: {
+            username: "admin",
+            firstName: "Admin",
+            lastName: "User",
+            email: "admin@example.test",
+            emailVerified: true,
+            createdAt: "2026-08-20T10:00:00Z",
+            updatedAt: "2026-08-20T10:00:00Z",
+          },
+        } as never;
+      }
+      if (config.url === "/api/account/profile/attributes") {
+        return { status: 200, data: { definitions: [], attributes: {} } } as never;
+      }
+      if (config.url === "/api/account/profile/avatar" && !config.method) {
+        return { status: 200, data: { avatarUrl: "/avatars/current?v=1" } } as never;
+      }
+      throw new Error("avatar operation failed");
+    });
+
+    renderWithStore(<AccountProfileForm dictionary={dictionary} />);
+
+    const upload = await screen.findByLabelText(dictionary.account.profile.uploadAvatar);
+    fireEvent.change(upload, {
+      target: { files: [new File(["image"], "avatar.png", { type: "image/png" })] },
+    });
+    expect(await screen.findByText(dictionary.account.profile.avatarUploadError)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: dictionary.account.profile.removeAvatar }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.account.profile.removeAvatar,
+      }),
+    );
+
+    await waitFor(() => expect(mockAddError).toHaveBeenCalledTimes(2));
+    expect(mockAddError).toHaveBeenNthCalledWith(1, dictionary.account.common.operationError);
+    expect(mockAddError).toHaveBeenNthCalledWith(2, dictionary.account.common.operationError);
   });
 
   it("renders built-in and custom profile fields in display order", async () => {

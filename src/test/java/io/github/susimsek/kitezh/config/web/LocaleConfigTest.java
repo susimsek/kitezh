@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.web.WebProperties;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.servlet.i18n.CookieLocaleResolver;
 
@@ -158,6 +159,37 @@ class LocaleConfigTest {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addPreferredLocale(Locale.ENGLISH);
 
+        assertThat(resolver.resolveLocale(request)).isEqualTo(Locale.ENGLISH);
+    }
+
+    @Test
+    void ignoresAuthenticatedPrincipalsWithoutNamesAndUsersWithoutLocalePreferences() {
+        LocalizationSettingsService settings = mock(LocalizationSettingsService.class);
+        UserRepository users = mock(UserRepository.class);
+        when(settings.isInternationalizationEnabled()).thenReturn(true);
+        when(settings.isSupported(Locale.ENGLISH)).thenReturn(true);
+        CookieLocaleResolver resolver =
+                (CookieLocaleResolver)
+                        new LocaleConfig(settings, users).localeResolver(new WebProperties());
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setParameter("ui_locales", "en");
+
+        Authentication unnamed = mock(Authentication.class);
+        when(unnamed.isAuthenticated()).thenReturn(true);
+        when(unnamed.getName()).thenReturn(null);
+        SecurityContextHolder.getContext().setAuthentication(unnamed);
+        assertThat(resolver.resolveLocale(request)).isEqualTo(Locale.ENGLISH);
+
+        UserEntity userWithoutLocale = new UserEntity();
+        when(users.findByUsername("alice")).thenReturn(Optional.of(userWithoutLocale));
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new TestingAuthenticationToken("alice", "token", java.util.List.of()));
+
+        assertThat(resolver.resolveLocale(request)).isEqualTo(Locale.ENGLISH);
+        userWithoutLocale.setPreferredLocale(" ");
+        assertThat(resolver.resolveLocale(request)).isEqualTo(Locale.ENGLISH);
+        userWithoutLocale.setPreferredLocale("de");
         assertThat(resolver.resolveLocale(request)).isEqualTo(Locale.ENGLISH);
     }
 

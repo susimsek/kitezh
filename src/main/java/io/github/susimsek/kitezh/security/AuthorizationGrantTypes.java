@@ -12,4 +12,7 @@ public final class AuthorizationGrantTypes {
 
     /** OpenID Connect Client-Initiated Backchannel Authentication grant. */
     public static final String CIBA = "urn:openid:params:grant-type:ciba";
+
+    /** UMA 2.0 permission-ticket grant. */
+    public static final String UMA_TICKET = "urn:ietf:params:oauth:grant-type:uma-ticket";
 }

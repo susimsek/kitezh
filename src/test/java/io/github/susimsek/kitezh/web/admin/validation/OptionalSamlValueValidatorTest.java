@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.github.susimsek.kitezh.validation.validator.OptionalAbsoluteUriValidator;
+import io.github.susimsek.kitezh.validation.validator.OptionalPemValidator;
 import org.junit.jupiter.api.Test;
 
 class OptionalSamlValueValidatorTest {
@@ -37,6 +39,15 @@ class OptionalSamlValueValidatorTest {
                         validator.isValid(
                                 "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----",
                                 null))
+                .isFalse();
+        assertThat(
+                        validator.isValid(
+                                "-----BEGIN CERTIFICATE-----\nabc\n-----END PRIVATE KEY-----",
+                                null))
+                .isFalse();
+        assertThat(
+                        validator.isValid(
+                                "-----BEGIN CERTIFICATE-----abc-----END CERTIFICATE-----", null))
                 .isFalse();
         assertThat(validator.isValid("not-pem", null)).isFalse();
     }

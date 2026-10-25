@@ -208,6 +208,127 @@ class AccountLockServiceTest {
     }
 
     @Test
+    void capsTemporaryLockWaitAtConfiguredMaximum() {
+        ApplicationProperties.BruteForce policy =
+                new ApplicationProperties.BruteForce(
+                        true,
+                        1,
+                        Duration.ofMinutes(1),
+                        Duration.ofMinutes(1),
+                        Duration.ofMinutes(1),
+                        Duration.ofSeconds(1),
+                        Duration.ofHours(12),
+                        3,
+                        false,
+                        30,
+                        5);
+        when(applicationProperties.security())
+                .thenReturn(
+                        new ApplicationProperties.Security(
+                                new ApplicationProperties.PasswordPolicy(), policy));
+        UserEntity user = user(7L, "alice");
+        when(userRepository.findForLoginUpdate("alice")).thenReturn(Optional.of(user));
+        AccountLockService service =
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
+
+        service.recordFailure("alice", "127.0.0.1");
+
+        assertThat(user.getLockedUntil()).isAfter(Instant.now());
+        assertThat(user.getLockedUntil()).isBefore(Instant.now().plusSeconds(2));
+    }
+
+    @Test
+    void permanentlyLocksImmediatelyWhenPolicyRequiresIt() {
+        ApplicationProperties.BruteForce policy = policy(true, 1, 0, true);
+        when(applicationProperties.security())
+                .thenReturn(
+                        new ApplicationProperties.Security(
+                                new ApplicationProperties.PasswordPolicy(), policy));
+        UserEntity user = user(7L, "alice");
+        when(userRepository.findForLoginUpdate("alice")).thenReturn(Optional.of(user));
+        AccountLockService service =
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
+
+        service.recordFailure("alice", "127.0.0.1");
+
+        assertThat(user.isPermanentlyLocked()).isTrue();
+        assertThat(user.getLockedUntil()).isNull();
+        verify(invalidationService).invalidate("alice");
+    }
+
+    @Test
+    void skipsNullAndBlankFailureNamesWhenBruteForceIsEnabled() {
+        when(applicationProperties.security())
+                .thenReturn(
+                        new ApplicationProperties.Security(
+                                new ApplicationProperties.PasswordPolicy(),
+                                policy(true, 5, 3, false)));
+        AccountLockService service =
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
+
+        service.recordFailure(null, "127.0.0.1");
+        service.recordFailure(" ", "127.0.0.1");
+
+        verify(userRepository, never())
+                .findForLoginUpdate(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void doesNotCreateTemporaryLockoutsWhenTheirLimitIsDisabled() {
+        when(applicationProperties.security())
+                .thenReturn(
+                        new ApplicationProperties.Security(
+                                new ApplicationProperties.PasswordPolicy(),
+                                policy(true, 1, 0, false)));
+        UserEntity user = user(7L, "alice");
+        when(userRepository.findForLoginUpdate("alice")).thenReturn(Optional.of(user));
+        AccountLockService service =
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
+
+        service.recordFailure("alice", "127.0.0.1");
+
+        assertThat(user.isPermanentlyLocked()).isFalse();
+        assertThat(user.getLockedUntil()).isAfter(Instant.now());
+        org.mockito.Mockito.verifyNoInteractions(invalidationService);
+    }
+
+    @Test
+    void doesNotApplyQuickWaitForFailuresOutsideTheQuickLoginWindow() {
+        ApplicationProperties.BruteForce policy =
+                new ApplicationProperties.BruteForce(
+                        true,
+                        5,
+                        Duration.ofMinutes(1),
+                        Duration.ofMinutes(1),
+                        Duration.ofMinutes(1),
+                        Duration.ofMinutes(15),
+                        Duration.ofHours(12),
+                        3,
+                        false,
+                        30,
+                        5);
+        when(applicationProperties.security())
+                .thenReturn(
+                        new ApplicationProperties.Security(
+                                new ApplicationProperties.PasswordPolicy(), policy));
+        UserEntity user = user(7L, "alice");
+        user.setLastFailedLoginAt(Instant.now().minus(Duration.ofMinutes(5)));
+        when(userRepository.findForLoginUpdate("alice")).thenReturn(Optional.of(user));
+        AccountLockService service =
+                new AccountLockService(
+                        userRepository, invalidationService, applicationProperties, null);
+
+        service.recordFailure("alice", "127.0.0.1");
+
+        assertThat(user.getFailedLoginCount()).isEqualTo(1);
+        assertThat(user.getLockedUntil()).isNull();
+    }
+
+    @Test
     void unlockResetsMfaLockStateAndHandlesMissingUsers() {
         UserEntity user = user(7L, "alice");
         user.setMfaFailedAttemptCount(4);

@@ -2,15 +2,21 @@ package io.github.susimsek.kitezh.config.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.github.susimsek.kitezh.domain.SamlProviderConfigEntity;
 import io.github.susimsek.kitezh.domain.SocialProviderEntity;
 import io.github.susimsek.kitezh.repository.SamlProviderConfigRepository;
 import io.github.susimsek.kitezh.repository.SocialProviderRepository;
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyPairGenerator;
 import java.util.Base64;
 import java.util.List;
@@ -18,9 +24,15 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.saml2.Saml2Exception;
+import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistration;
+import org.springframework.security.saml2.provider.service.registration.RelyingPartyRegistrations;
 import org.springframework.security.saml2.provider.service.registration.Saml2MessageBinding;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 @ExtendWith(MockitoExtension.class)
@@ -181,6 +193,63 @@ class SamlRelyingPartyRegistrationRepositoryTest {
         repository.refresh();
 
         assertThat(repository.findByRegistrationId(provider.getAlias())).isNull();
+    }
+
+    @Test
+    void retriesMetadataAfterRemovingUnsupportedContactPersonElements() throws Exception {
+        SocialProviderEntity provider = provider();
+        SamlProviderConfigEntity config = new SamlProviderConfigEntity();
+        config.setProviderId(provider.getId());
+        String metadataUri = "https://idp.example.test/metadata";
+        config.setMetadataUri(metadataUri);
+        String metadata =
+                "<EntityDescriptor><ContactPerson contactType=\"technical\">"
+                        + "<GivenName>Administrator</GivenName></ContactPerson>"
+                        + "<IDPSSODescriptor/></EntityDescriptor>";
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo(metadataUri))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(metadata, MediaType.APPLICATION_XML));
+        when(providerRepository.findAllByProviderTypeIgnoreCaseAndEnabledTrueOrderByGuiOrderAsc(
+                        "saml"))
+                .thenReturn(List.of(provider));
+        when(configRepository.findByProviderId(provider.getId())).thenReturn(Optional.of(config));
+        RelyingPartyRegistration.Builder registrationBuilder =
+                RelyingPartyRegistration.withRegistrationId("metadata")
+                        .assertingPartyMetadata(
+                                party ->
+                                        party.entityId("https://idp.example.test/entity")
+                                                .singleSignOnServiceLocation(
+                                                        "https://idp.example.test/sso"));
+
+        try (MockedStatic<RelyingPartyRegistrations> registrations =
+                mockStatic(RelyingPartyRegistrations.class)) {
+            registrations
+                    .when(() -> RelyingPartyRegistrations.fromMetadataLocation(metadataUri))
+                    .thenThrow(new Saml2Exception("invalid value for contactType attribute"));
+            registrations
+                    .when(
+                            () ->
+                                    RelyingPartyRegistrations.fromMetadata(
+                                            org.mockito.ArgumentMatchers.any(InputStream.class)))
+                    .thenAnswer(
+                            invocation -> {
+                                InputStream input = invocation.getArgument(0);
+                                String sanitized =
+                                        new String(input.readAllBytes(), StandardCharsets.UTF_8);
+                                assertThat(sanitized).doesNotContain("ContactPerson");
+                                return registrationBuilder;
+                            });
+
+            SamlRelyingPartyRegistrationRepository repository =
+                    new SamlRelyingPartyRegistrationRepository(
+                            providerRepository, configRepository, secretCipher, builder);
+            repository.refresh();
+
+            assertThat(repository.findByRegistrationId(provider.getAlias())).isNotNull();
+            server.verify();
+        }
     }
 
     @Test

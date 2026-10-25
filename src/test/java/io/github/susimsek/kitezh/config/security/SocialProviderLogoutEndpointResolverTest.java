@@ -2,6 +2,8 @@ package io.github.susimsek.kitezh.config.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.config.http.HttpServiceClientFactory;
@@ -116,5 +118,64 @@ class SocialProviderLogoutEndpointResolverTest {
                 .thenReturn(java.util.Map.of("issuer", "https://accounts.google.com"));
 
         assertThat(new SocialProviderLogoutEndpointResolver(discovery).resolve(provider)).isNull();
+    }
+
+    @Test
+    void cachesDiscoveredLogoutEndpointForRepeatedResolution() {
+        ProviderCredentials provider = mock(ProviderCredentials.class);
+        when(provider.providerType()).thenReturn("oidc");
+        when(provider.issuerUri()).thenReturn("https://issuer.example");
+        OidcDiscoveryClient discovery = mock(OidcDiscoveryClient.class);
+        when(discovery.discover(
+                        java.net.URI.create(
+                                "https://issuer.example/.well-known/openid-configuration")))
+                .thenReturn(
+                        java.util.Map.of("end_session_endpoint", "https://issuer.example/logout"));
+        var resolver = new SocialProviderLogoutEndpointResolver(discovery);
+
+        assertThat(resolver.resolve(provider)).isEqualTo("https://issuer.example/logout");
+        assertThat(resolver.resolve(provider)).isEqualTo("https://issuer.example/logout");
+
+        verify(discovery)
+                .discover(
+                        java.net.URI.create(
+                                "https://issuer.example/.well-known/openid-configuration"));
+    }
+
+    @Test
+    void skipsNonHttpIssuerDiscoveryAndUsesSupportedFallback() {
+        ProviderCredentials provider = mock(ProviderCredentials.class);
+        when(provider.providerType()).thenReturn("microsoft");
+        when(provider.issuerUri()).thenReturn("ftp://issuer.example");
+        OidcDiscoveryClient discovery = mock(OidcDiscoveryClient.class);
+
+        assertThat(new SocialProviderLogoutEndpointResolver(discovery).resolve(provider))
+                .isEqualTo("https://login.microsoftonline.com/common/oauth2/v2.0/logout");
+        verify(discovery, never()).discover(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void toleratesMissingDiscoveryMetadataAndUsesBuiltInFallback() {
+        ProviderCredentials provider = mock(ProviderCredentials.class);
+        when(provider.providerType()).thenReturn("microsoft");
+        when(provider.issuerUri()).thenReturn("https://issuer.example");
+        OidcDiscoveryClient discovery = mock(OidcDiscoveryClient.class);
+        when(discovery.discover(
+                        java.net.URI.create(
+                                "https://issuer.example/.well-known/openid-configuration")))
+                .thenReturn(null);
+
+        assertThat(new SocialProviderLogoutEndpointResolver(discovery).resolve(provider))
+                .isEqualTo("https://login.microsoftonline.com/common/oauth2/v2.0/logout");
+    }
+
+    @Test
+    void defaultDiscoveryClientReturnsNoMetadataAndKeepsProviderFallback() {
+        ProviderCredentials provider = mock(ProviderCredentials.class);
+        when(provider.providerType()).thenReturn("microsoft");
+        when(provider.issuerUri()).thenReturn("https://issuer.example");
+
+        assertThat(new SocialProviderLogoutEndpointResolver().resolve(provider))
+                .isEqualTo("https://login.microsoftonline.com/common/oauth2/v2.0/logout");
     }
 }

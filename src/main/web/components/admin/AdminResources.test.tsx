@@ -253,6 +253,29 @@ describe("AdminResources", () => {
     expect(mockLogout).toHaveBeenCalledWith("en", { sessionAlreadyRevoked: true });
   });
 
+  it("reports an error when global session revocation fails", async () => {
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (!config.method) {
+        return { status: 200, data: page([]) } as never;
+      }
+      return { status: 503, data: null } as never;
+    });
+
+    render(<AdminResources copy={dictionary.admin.resources} locale="en" resource="sessions" />);
+    await screen.findByText(dictionary.admin.resources.empty);
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.admin.resources.revokeAllSessions }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.resources.revokeAllSessions,
+      }),
+    );
+
+    expect(await screen.findByText(dictionary.admin.resources.operationError)).toBeVisible();
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
   it("logs out the current user after deleting all of their sessions", async () => {
     mockAdminRequest.mockImplementation(async (_token, config) => {
       if (!config.method) {
@@ -648,6 +671,78 @@ describe("AdminResources", () => {
     }
   });
 
+  it("reports a failed bulk lifecycle action after confirmation", async () => {
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (!config.method)
+        return {
+          status: 200,
+          data: page([
+            { id: 1, username: "ada", enabled: true, avatarUrl: null, authorities: ["ROLE_USER"] },
+          ]),
+        } as never;
+      return { status: 500, data: null } as never;
+    });
+
+    render(<AdminResources copy={dictionary.admin.resources} locale="en" resource="users" />);
+    await screen.findByRole("link", { name: "ada" });
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: dictionary.admin.resources.selectAllUsers }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.resources.bulkEnable }));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.resources.bulkEnable,
+      }),
+    );
+
+    expect(await screen.findByText(dictionary.admin.resources.operationError)).toBeVisible();
+    expect(mockAdminRequest).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({
+        method: "POST",
+        url: "/api/admin/users/bulk",
+        data: { userIds: [1], action: "ENABLE" },
+      }),
+    );
+  });
+
+  it("shows active and passive key states in the key inventory", async () => {
+    mockAdminRequest.mockResolvedValue({
+      status: 200,
+      data: page([
+        {
+          id: "active-key",
+          kid: "signing-current",
+          type: "RSA",
+          algorithm: "RS256",
+          active: true,
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          id: "passive-key",
+          kid: "signing-previous",
+          type: "RSA",
+          algorithm: "RS256",
+          active: false,
+          createdAt: "2025-01-01T00:00:00Z",
+        },
+      ]),
+    } as never);
+
+    render(<AdminResources copy={dictionary.admin.resources} resource="keys" />);
+
+    const activeRow = (await screen.findByText("signing-current")).closest("tr");
+    const passiveRow = screen.getByText("signing-previous").closest("tr");
+    expect(activeRow).not.toBeNull();
+    expect(passiveRow).not.toBeNull();
+    expect(
+      within(activeRow as HTMLElement).getByText(dictionary.admin.resources.active),
+    ).toBeVisible();
+    expect(
+      within(passiveRow as HTMLElement).getByText(dictionary.admin.resources.passive),
+    ).toBeVisible();
+  });
+
   it("reports failed key rotation and exercises session/consent filter controls", async () => {
     mockAdminRequest
       .mockResolvedValueOnce({ status: 200, data: page([]) } as never)
@@ -687,5 +782,193 @@ describe("AdminResources", () => {
       },
     );
     consentView.unmount();
+  });
+
+  it("renders localized consent links and both user-name and role fallbacks", async () => {
+    mockAdminRequest.mockResolvedValue({
+      status: 200,
+      data: page([
+        {
+          id: 1,
+          username: "ada",
+          firstName: "Ada",
+          lastName: "Lovelace",
+          enabled: true,
+          avatarUrl: null,
+          authorities: ["ROLE_USER"],
+          effectiveRoles: ["ROLE_CUSTOM"],
+        },
+        {
+          id: 2,
+          username: "lin",
+          firstName: null,
+          lastName: null,
+          enabled: false,
+          avatarUrl: null,
+          authorities: ["ROLE_FALLBACK"],
+        },
+      ]),
+    } as never);
+    const users = render(
+      <AdminResources copy={dictionary.admin.resources} locale="en" resource="users" />,
+    );
+    expect(await screen.findByText("Ada Lovelace")).toBeVisible();
+    expect(screen.getByText("ROLE_CUSTOM")).toBeVisible();
+    expect(screen.getByText("ROLE_FALLBACK")).toBeVisible();
+    const selectAll = screen.getByRole("checkbox", {
+      name: dictionary.admin.resources.selectAllUsers,
+    });
+    fireEvent.click(selectAll);
+    fireEvent.click(selectAll);
+    expect(
+      screen.queryByText(dictionary.admin.resources.selectedUsers.replace("{count}", "2")),
+    ).not.toBeInTheDocument();
+    users.unmount();
+
+    mockAdminRequest.mockResolvedValue({
+      status: 200,
+      data: page([
+        {
+          clientId: "web-client",
+          clientName: "Web client",
+          principalName: "ada",
+          userId: 42,
+          authorities: ["SCOPE_openid"],
+          createdAt: "2026-01-01T00:00:00Z",
+        },
+        {
+          clientId: "legacy-client",
+          clientName: "Legacy client",
+          principalName: "legacy-user",
+          userId: null,
+          authorities: [],
+          createdAt: "2026-01-02T00:00:00Z",
+        },
+      ]),
+    } as never);
+    render(<AdminResources copy={dictionary.admin.resources} locale="en" resource="consents" />);
+    expect(await screen.findByRole("link", { name: "ada" })).toHaveAttribute(
+      "href",
+      "/admin/users/42/details",
+    );
+    expect(screen.getByRole("link", { name: "Web client" })).toHaveAttribute(
+      "href",
+      "/admin/clients/web-client/settings",
+    );
+    expect(screen.getByText("legacy-user")).toBeVisible();
+    expect(screen.getByText("openid")).toBeVisible();
+  });
+
+  it("applies and clears session filters and refreshes after revocation without a locale", async () => {
+    window.history.replaceState({}, "", "/admin/sessions?status=expired&clientId=old-client");
+    act(() => window.dispatchEvent(new Event("admin-table-state")));
+    const session = {
+      id: "session-filtered",
+      username: "ada",
+      createdAt: "2026-01-01T12:00:00Z",
+      lastAccessedAt: "2026-01-01T12:30:00Z",
+      expiresAt: "2026-01-01T13:00:00Z",
+      authorizationCount: 1,
+      active: true,
+    };
+    mockAdminRequest.mockImplementation(async (_token, config) => {
+      if (config.method === "POST" || config.method === "DELETE") {
+        return { status: 204, data: null } as never;
+      }
+      return { status: 200, data: page([session]) } as never;
+    });
+
+    render(<AdminResources copy={dictionary.admin.resources} resource="sessions" />);
+    expect(await screen.findByText("ada")).toBeVisible();
+    fireEvent.change(
+      screen.getByRole("combobox", { name: dictionary.admin.resources.sessionStatus }),
+      { target: { value: "all" } },
+    );
+    expect(await screen.findByText("ada")).toBeVisible();
+    fireEvent.change(screen.getByRole("textbox", { name: dictionary.admin.resources.clientId }), {
+      target: { value: "new-client" },
+    });
+    expect(await screen.findByText("ada")).toBeVisible();
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith(
+        "token",
+        expect.objectContaining({ url: expect.stringContaining("status=all&clientId=new-client") }),
+      ),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: `${dictionary.admin.resources.client}: new-client` }),
+    );
+    await waitFor(() => expect(window.location.search).toContain("status=all"));
+    expect(await screen.findByText("ada")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.resources.clearFilters }));
+    await waitFor(() => expect(window.location.search).toBe(""));
+    expect(await screen.findByText("ada")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Session actions" }));
+    fireEvent.click(screen.getByText(dictionary.admin.resources.signOut));
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.resources.cancel }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.admin.resources.revokeAllSessions }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.resources.cancel }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(
+      screen.getByRole("button", { name: dictionary.admin.resources.revokeAllSessions }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.resources.revokeAllSessions,
+      }),
+    );
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith("token", {
+        method: "POST",
+        url: "/api/admin/sessions/revoke-all",
+      }),
+    );
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
+
+  it("shows a plain consent row when unlocalized and cancels before revoking", async () => {
+    mockAdminRequest.mockResolvedValue({
+      status: 200,
+      data: page([
+        {
+          clientId: "legacy-client",
+          clientName: "Legacy client",
+          principalName: "legacy-user",
+          userId: null,
+          authorities: [],
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+        },
+      ]),
+    } as never);
+    render(<AdminResources copy={dictionary.admin.resources} resource="consents" />);
+
+    expect(await screen.findByText("legacy-user")).toBeVisible();
+    expect(screen.getByText("Legacy client").closest("a")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Legacy client consent actions" }));
+    expect(screen.queryByText(dictionary.admin.resources.details)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(dictionary.admin.resources.revoke));
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.resources.cancel }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Legacy client consent actions" }));
+    fireEvent.click(screen.getByText(dictionary.admin.resources.revoke));
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: dictionary.admin.resources.revoke,
+      }),
+    );
+    await waitFor(() =>
+      expect(mockAdminRequest).toHaveBeenCalledWith("token", {
+        url: "/api/admin/consents/legacy-client/legacy-user",
+        method: "DELETE",
+        data: undefined,
+      }),
+    );
   });
 });

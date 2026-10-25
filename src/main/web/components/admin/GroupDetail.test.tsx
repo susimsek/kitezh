@@ -112,6 +112,39 @@ it("edits group attributes and the default-group flag", async () => {
   );
 });
 
+it("shows validation feedback for malformed group attributes without saving", async () => {
+  mockGroupIsAdmin = true;
+  const request = jest.mocked(adminRequest);
+  request.mockReset();
+  request.mockImplementation(
+    async (_token, config) =>
+      ({
+        status: 200,
+        data:
+          config.url === "/api/admin/groups/7"
+            ? {
+                id: 7,
+                name: "Operators",
+                path: "/Operators",
+                parentId: null,
+                roles: [],
+                userCount: 0,
+                attributes: {},
+                defaultGroup: false,
+              }
+            : { content: [], totalPages: 0, totalElements: 0 },
+      }) as never,
+  );
+
+  render(<GroupDetail id="7" locale="en" dictionary={en} />);
+  const attributes = await screen.findByRole("textbox", { name: en.admin.groups.attributes });
+  fireEvent.change(attributes, { target: { value: "{invalid" } });
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.save }));
+
+  expect(await screen.findByText(en.admin.groups.attributeFormat)).toBeVisible();
+  expect(request.mock.calls.some(([, config]) => config.method === "PUT")).toBe(false);
+});
+
 it("shows permission actions on the permissions tab", async () => {
   mockGroupIsAdmin = true;
   const request = jest.mocked(adminRequest);
@@ -140,6 +173,43 @@ it("shows permission actions on the permissions tab", async () => {
 
   expect(await screen.findByRole("heading", { name: en.admin.groups.permissions })).toBeVisible();
   expect(screen.getByRole("button", { name: en.admin.groups.addPermission })).toBeVisible();
+});
+
+it("shows group permissions without edit actions for a non-admin", async () => {
+  mockGroupIsAdmin = false;
+  const request = jest.mocked(adminRequest);
+  request.mockReset();
+  request.mockImplementation(async (_token, config) => {
+    if (config.url === "/api/admin/groups/7") {
+      return {
+        status: 200,
+        data: {
+          id: 7,
+          name: "Operators",
+          path: "/Operators",
+          parentId: null,
+          roles: [],
+          userCount: 0,
+          attributes: {},
+          defaultGroup: false,
+        },
+      } as never;
+    }
+    if (config.url === "/api/admin/groups/7/permissions") {
+      return {
+        status: 200,
+        data: [{ userId: 1, username: "admin", permission: "VIEW" }],
+      } as never;
+    }
+    return { status: 200, data: { content: [], totalPages: 0, totalElements: 0 } } as never;
+  });
+
+  render(<GroupDetail id="7" locale="en" dictionary={en} tab="permissions" />);
+
+  expect(await screen.findByText("admin: VIEW")).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: en.admin.groups.addPermission }),
+  ).not.toBeInTheDocument();
 });
 
 it("sorts group members by username", async () => {
@@ -253,6 +323,109 @@ it("saves role mappings and permission assignments", async () => {
   );
 });
 
+it("handles a rejected role mapping update", async () => {
+  mockGroupIsAdmin = true;
+  const request = jest.mocked(adminRequest);
+  request.mockReset();
+  request.mockImplementation(async (_token, config) => {
+    if (config.url === "/api/admin/groups/7") {
+      return {
+        status: 200,
+        data: {
+          id: 7,
+          name: "Operators",
+          path: "/Operators",
+          parentId: null,
+          roles: [],
+          userCount: 0,
+          attributes: {},
+          defaultGroup: false,
+        },
+      } as never;
+    }
+    if (config.url === "/api/admin/roles?page=0&size=100") {
+      return { status: 200, data: { content: [{ name: "ROLE_ADMIN" }] } } as never;
+    }
+    if (config.url?.endsWith("/roles") && config.method === "PUT") {
+      return { status: 400, data: null } as never;
+    }
+    return { status: 200, data: { content: [], totalPages: 0, totalElements: 0 } } as never;
+  });
+
+  render(<GroupDetail id="7" locale="en" dictionary={en} tab="roles" />);
+  const role = await screen.findByLabelText("ROLE_ADMIN");
+  fireEvent.click(role);
+  const save = screen.getByRole("button", { name: en.admin.groups.saveMappings });
+  await waitFor(() => expect(save).not.toBeDisabled());
+  fireEvent.click(save);
+
+  await waitFor(() =>
+    expect(
+      request.mock.calls.some(
+        ([, config]) => config.url?.endsWith("/roles") && config.method === "PUT",
+      ),
+    ).toBe(true),
+  );
+  await waitFor(() => expect(save).not.toBeDisabled());
+});
+
+it("keeps group settings and member removal recoverable after API rejection", async () => {
+  mockGroupIsAdmin = true;
+  const request = jest.mocked(adminRequest);
+  request.mockReset();
+  request.mockImplementation(async (_token, config) => {
+    if (config.url === "/api/admin/groups/7" && config.method === "PUT")
+      return { status: 500, data: null } as never;
+    if (config.url === "/api/admin/groups/7") {
+      return {
+        status: 200,
+        data: {
+          id: 7,
+          name: "Operators",
+          path: "/Operators",
+          parentId: null,
+          roles: [],
+          userCount: 1,
+          attributes: {},
+          defaultGroup: false,
+        },
+      } as never;
+    }
+    if (config.method === "DELETE") return { status: 500, data: null } as never;
+    if (config.url?.includes("/users?")) {
+      return {
+        status: 200,
+        data: {
+          content: [{ id: 2, username: "member", enabled: true }],
+          totalPages: 1,
+          totalElements: 1,
+        },
+      } as never;
+    }
+    return { status: 200, data: { content: [], totalPages: 0, totalElements: 0 } } as never;
+  });
+
+  const view = render(<GroupDetail id="7" locale="en" dictionary={en} />);
+  const name = await screen.findByRole("textbox", { name: en.admin.groups.name });
+  fireEvent.change(name, { target: { value: "Updated operators" } });
+  const saveSettings = screen.getByRole("button", { name: en.admin.common.save });
+  await waitFor(() => expect(saveSettings).not.toBeDisabled());
+  fireEvent.click(saveSettings);
+  await waitFor(() =>
+    expect(
+      request.mock.calls.some(
+        ([, config]) => config.url === "/api/admin/groups/7" && config.method === "PUT",
+      ),
+    ).toBe(true),
+  );
+
+  view.rerender(<GroupDetail id="7" locale="en" dictionary={en} tab="members" />);
+  fireEvent.click(await screen.findByRole("button", { name: en.admin.groups.removeUser }));
+  await waitFor(() =>
+    expect(request.mock.calls.some(([, config]) => config.method === "DELETE")).toBe(true),
+  );
+});
+
 it("adds and removes group members through search suggestions", async () => {
   mockGroupIsAdmin = true;
   const request = jest.mocked(adminRequest);
@@ -312,4 +485,166 @@ it("adds and removes group members through search suggestions", async () => {
   await waitFor(() =>
     expect(request.mock.calls.some(([, config]) => config.method === "DELETE")).toBe(true),
   );
+});
+
+it("saves an empty attribute object with a selected parent group", async () => {
+  mockGroupIsAdmin = true;
+  const request = jest.mocked(adminRequest);
+  request.mockReset();
+  request.mockImplementation(async (_token, config) => {
+    if (config.url === "/api/admin/groups/7" && config.method === "PUT") {
+      return {
+        status: 200,
+        data: {
+          id: 7,
+          name: "Operators",
+          path: "/Root/Operators",
+          parentId: 8,
+          roles: [],
+          userCount: 0,
+          attributes: null,
+          defaultGroup: false,
+        },
+      } as never;
+    }
+    if (config.url === "/api/admin/groups/7") {
+      return {
+        status: 200,
+        data: {
+          id: 7,
+          name: "Operators",
+          path: "/Operators",
+          parentId: null,
+          roles: [],
+          userCount: 0,
+          attributes: {},
+          defaultGroup: false,
+        },
+      } as never;
+    }
+    if (config.url === "/api/admin/groups?page=0&size=100") {
+      return {
+        status: 200,
+        data: { content: [{ id: 8, name: "Root", path: "/Root" }], totalPages: 1 },
+      } as never;
+    }
+    return { status: 200, data: { content: [], totalPages: 0, totalElements: 0 } } as never;
+  });
+
+  render(<GroupDetail id="7" locale="en" dictionary={en} />);
+  const attributes = await screen.findByRole("textbox", { name: en.admin.groups.attributes });
+  fireEvent.change(attributes, { target: { value: "  " } });
+  fireEvent.change(screen.getByRole("combobox", { name: en.admin.groups.parent }), {
+    target: { value: "8" },
+  });
+  const save = screen.getByRole("button", { name: en.admin.common.save });
+  await waitFor(() => expect(save).not.toBeDisabled());
+  fireEvent.click(save);
+
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith("token", {
+      url: "/api/admin/groups/7",
+      method: "PUT",
+      data: {
+        name: "Operators",
+        parentId: 8,
+        attributes: {},
+        defaultGroup: false,
+      },
+    }),
+  );
+});
+
+it("handles malformed permission and user lists and a rejected permission save", async () => {
+  mockGroupIsAdmin = true;
+  const request = jest.mocked(adminRequest);
+  request.mockReset();
+  request.mockImplementation(async (_token, config) => {
+    if (config.url === "/api/admin/groups/7") {
+      return {
+        status: 200,
+        data: {
+          id: 7,
+          name: "Operators",
+          path: "/Operators",
+          parentId: null,
+          roles: [],
+          userCount: 0,
+          attributes: {},
+          defaultGroup: false,
+        },
+      } as never;
+    }
+    if (config.url === "/api/admin/groups/7/permissions") {
+      return config.method === "PUT"
+        ? ({ status: 500, data: null } as never)
+        : ({ status: 200, data: { malformed: true } } as never);
+    }
+    if (config.url === "/api/admin/users?page=0&size=100") {
+      return { status: 503, data: null } as never;
+    }
+    return { status: 200, data: { content: [], totalPages: 0, totalElements: 0 } } as never;
+  });
+
+  render(<GroupDetail id="7" locale="en" dictionary={en} tab="permissions" />);
+  fireEvent.click(await screen.findByRole("button", { name: en.admin.groups.addPermission }));
+  const userSelect = screen.getByRole("combobox", { name: en.admin.groups.permissionUser });
+  expect(userSelect.querySelectorAll("option")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: en.admin.groups.savePermissions }));
+
+  await waitFor(() =>
+    expect(
+      request.mock.calls.some(
+        ([, config]) => config.url === "/api/admin/groups/7/permissions" && config.method === "PUT",
+      ),
+    ).toBe(true),
+  );
+});
+
+it("does not show failed member suggestions and renders disabled member status", async () => {
+  mockGroupIsAdmin = true;
+  const request = jest.mocked(adminRequest);
+  request.mockReset();
+  request.mockImplementation(async (_token, config) => {
+    if (config.url === "/api/admin/groups/7") {
+      return {
+        status: 200,
+        data: {
+          id: 7,
+          name: "Operators",
+          path: "/Operators",
+          parentId: null,
+          roles: [],
+          userCount: 1,
+          attributes: {},
+          defaultGroup: false,
+        },
+      } as never;
+    }
+    if (config.url?.includes("available-users")) return { status: 503, data: null } as never;
+    if (config.url?.includes("/users?")) {
+      return {
+        status: 200,
+        data: {
+          content: [{ id: 2, username: "disabled-member", enabled: false }],
+          totalPages: 1,
+          totalElements: 1,
+        },
+      } as never;
+    }
+    return { status: 200, data: { content: [], totalPages: 0, totalElements: 0 } } as never;
+  });
+
+  render(<GroupDetail id="7" locale="en" dictionary={en} tab="members" />);
+  expect(await screen.findByText("disabled-member")).toBeVisible();
+  expect(screen.getByText(en.admin.resources.disabled)).toBeVisible();
+  fireEvent.change(screen.getByRole("textbox", { name: en.admin.groups.assignUser }), {
+    target: { value: "unknown" },
+  });
+  await waitFor(() =>
+    expect(
+      request.mock.calls.some(([, config]) => config.url?.includes("available-users?q=unknown")),
+    ).toBe(true),
+  );
+  expect(screen.queryByRole("button", { name: "unknown" })).not.toBeInTheDocument();
 });

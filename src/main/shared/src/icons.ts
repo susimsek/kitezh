@@ -1,5 +1,6 @@
 export const iconNames = [
   "add",
+  "bell",
   "arrowLeft",
   "arrowRight",
   "check",
@@ -26,6 +27,21 @@ export const iconNames = [
 
 export type AppIconName = (typeof iconNames)[number];
 
+export const socialProviderIconNames = {
+  generic: "globe",
+  github: "globe",
+  google: "globe",
+  linkedin: "globe",
+  microsoft: "globe",
+} as const satisfies Record<string, AppIconName>;
+
+export function socialProviderIcon(iconKey: string): AppIconName {
+  return (
+    socialProviderIconNames[iconKey as keyof typeof socialProviderIconNames] ??
+    "globe"
+  );
+}
+
 export const iconMetadata: Record<
   AppIconName,
   { labelKey: string; unicode: string; svg?: string }
@@ -35,6 +51,7 @@ export const iconMetadata: Record<
     unicode: "+",
     svg: '<path d="M12 5v14M5 12h14"/>',
   },
+  bell: { labelKey: "notificationsTitle", unicode: "♧" },
   arrowLeft: { labelKey: "back", unicode: "←" },
   arrowRight: { labelKey: "continue", unicode: "→" },
   check: { labelKey: "save", unicode: "✓", svg: '<path d="m5 12 4 4L19 6"/>' },

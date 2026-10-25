@@ -74,6 +74,29 @@ test("rejects download URLs outside the Kitezh GitHub release path", () => {
   );
 });
 
+test("rejects release assets whose tag or filename does not match the release", () => {
+  const mismatchedTag = {
+    ...release,
+    assets: {
+      androidApk:
+        "https://github.com/susimsek/kitezh/releases/download/v0.1.4/kitezh-0.1.5-android.apk",
+    },
+  };
+  const mismatchedFilename = {
+    ...release,
+    assets: {
+      androidApk:
+        "https://github.com/susimsek/kitezh/releases/download/v0.1.5/other-0.1.5-android.apk",
+    },
+  };
+
+  assert.equal(parseLatestRelease(mismatchedTag, "0.1.4", "android")?.asset, null);
+  assert.equal(
+    parseLatestRelease(mismatchedFilename, "0.1.4", "android")?.asset,
+    null,
+  );
+});
+
 test("uses the shared backend release metadata and tolerates missing assets", () => {
   const missingAsset = parseLatestRelease(
     { ...release, assets: {} },

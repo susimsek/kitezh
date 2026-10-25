@@ -1,0 +1,32 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Kitezh logo"
+    timeout: 180000
+- tapOn: "Continue|Devam et"
+- tapOn: "Sign in"
+- tapOn:
+    text: "Use without an account"
+    optional: true
+- tapOn:
+    text: "^Continue$"
+    optional: true
+- tapOn:
+    text: "Stay signed out"
+    optional: true
+- tapOn: "Continue with MFA and required actions"
+- assertVisible: "Two-factor authentication"
+- tapOn: "Authenticator code"
+- inputText: "123456"
+- tapOn: "Verify code"
+- assertVisible: "Update password"
+- tapOn: "New password"
+- inputText: "Good"
+- tapOn: "Complete required action"
+- extendedWaitUntil:
+    visible: "Account Console"
+    timeout: 180000
+- assertVisible: "fixture-user"

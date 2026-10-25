@@ -41,6 +41,7 @@ export function AccountTabBar({ active }: Readonly<{ active: AccountTab }>) {
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             key={tab.key}
+            testID={`account-tab-${tab.key}`}
             onPress={() => {
               if (!selected) router.replace(tab.route);
             }}
@@ -64,7 +65,7 @@ export function AccountTabBar({ active }: Readonly<{ active: AccountTab }>) {
               allowFontScaling
               style={{
                 color: selected ? palette.primary : palette.textMuted,
-                fontSize: Platform.OS === "ios" ? 11 : 12,
+                fontSize: Platform.OS === "ios" ? 13 : 14,
                 fontWeight: selected ? "700" : "500",
                 textAlign: "center",
               }}

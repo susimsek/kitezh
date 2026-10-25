@@ -54,19 +54,23 @@ test("exposes the narrow desktop API and forwards IPC operations", async () => {
   assert.equal(exposedApi.os, "darwin");
 
   await exposedApi.auth.startLogin("account");
+  await exposedApi.auth.cancelLogin("account");
   await exposedApi.auth.hasSession("account");
   await exposedApi.auth.clearSession("account");
   await exposedApi.auth.clearAllSessions();
   await exposedApi.auth.getStorageStatus();
   await exposedApi.auth.logout("account");
   await exposedApi.auth.openConsole("admin");
+  await exposedApi.auth.socialLink.start("github");
   await exposedApi.getConfig();
   await exposedApi.getAppVersion();
+  await exposedApi.api.request({ path: "/api/admin/dashboard" });
   await exposedApi.preferences.get();
   await exposedApi.preferences.set({ notifications: false });
   await exposedApi.preferences.reset();
   await exposedApi.diagnostics.get();
   await exposedApi.theme.set("dark");
+  await exposedApi.theme.get();
   await exposedApi.language.get();
   await exposedApi.language.getMode();
   await exposedApi.language.set("tr");
@@ -80,19 +84,23 @@ test("exposes the narrow desktop API and forwards IPC operations", async () => {
 
   assert.deepEqual(invocations, [
     ["desktop:auth-start-login", "account"],
+    ["desktop:auth-cancel-login", "account"],
     ["desktop:auth-has-session", "account"],
     ["desktop:auth-clear-session", "account"],
     ["desktop:auth-clear-all-sessions"],
     ["desktop:auth-storage-status"],
     ["desktop:auth-logout", "account"],
     ["desktop:auth-open-console", "admin"],
+    ["desktop:social-link-start", "github"],
     ["desktop:config"],
     ["desktop:app-version"],
+    ["desktop:api-request", { path: "/api/admin/dashboard" }],
     ["desktop:preferences-get"],
     ["desktop:preferences-set", { notifications: false }],
     ["desktop:preferences-reset"],
     ["desktop:diagnostics-get"],
     ["desktop:theme-set", "dark"],
+    ["desktop:theme-get"],
     ["desktop:language-get"],
     ["desktop:language-mode-get"],
     ["desktop:language-set", "tr"],
@@ -146,6 +154,17 @@ test("filters locale and theme events and cleans up bridge listeners", async () 
   logoutListener();
   removeLogoutListener();
   assert.deepEqual(logouts, ["logout"]);
+
+  const socialCallbacks = [];
+  const removeSocialCallback = exposedApi.auth.socialLink.onCallback((value) =>
+    socialCallbacks.push(value),
+  );
+  const socialLinkListener = listeners.get("desktop:social-link-callback");
+  const socialCallback = { provider: "github", error: "access_denied" };
+  socialLinkListener({}, socialCallback);
+  removeSocialCallback();
+  assert.deepEqual(socialCallbacks, [socialCallback]);
+  assert.equal(listeners.has("desktop:social-link-callback"), false);
 });
 
 test("replays the latest update status and lets subscribers unsubscribe", async () => {

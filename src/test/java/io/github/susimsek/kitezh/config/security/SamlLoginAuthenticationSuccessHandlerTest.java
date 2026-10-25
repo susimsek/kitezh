@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.github.susimsek.kitezh.dto.account.MfaStatusDTO;
+import io.github.susimsek.kitezh.service.DesktopSocialLinkTransactionService;
 import io.github.susimsek.kitezh.service.SamlLoginService;
 import io.github.susimsek.kitezh.service.SocialAccountLinkRequiredException;
 import io.github.susimsek.kitezh.service.SocialLoginService;
@@ -62,6 +63,47 @@ class SamlLoginAuthenticationSuccessHandlerTest {
         assertThat(request.getSession().getAttribute(SocialLoginService.SOCIAL_LOGIN_PROVIDER))
                 .isEqualTo("saml-e2e");
         verify(contexts).saveContext(any(), any(), any());
+    }
+
+    @Test
+    void completesPendingDesktopSamlLinkAndRedirectsToNativeCallback() throws Exception {
+        SamlLoginService service = mock(SamlLoginService.class);
+        UserDetailsService users = mock(UserDetailsService.class);
+        SecurityContextRepository contexts = mock(SecurityContextRepository.class);
+        DesktopSocialLinkTransactionService desktopTransactions =
+                mock(DesktopSocialLinkTransactionService.class);
+        Saml2Authentication authentication = authentication();
+        var completion =
+                new DesktopSocialLinkTransactionService.DesktopSocialLinkCompletion(
+                        "saml-e2e", "callback-state", "one-time-code");
+        when(desktopTransactions.completeFromBrowser(
+                        "pending-transaction", "saml-e2e", authentication))
+                .thenReturn(completion);
+        when(desktopTransactions.callbackUrl("callback-state", "one-time-code", null))
+                .thenReturn(
+                        "kitezh://social-link/callback?state=callback-state&code=one-time-code");
+        MockHttpServletRequest request = request();
+        request.getSession(true)
+                .setAttribute(
+                        DesktopSocialLinkTransactionService.PENDING_SESSION_ATTRIBUTE,
+                        "pending-transaction");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        new SamlLoginAuthenticationSuccessHandler(
+                        service, users, contexts, null, desktopTransactions)
+                .onAuthenticationSuccess(request, response, authentication);
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("kitezh://social-link/callback?state=callback-state&code=one-time-code");
+        assertThat(
+                        request.getSession()
+                                .getAttribute(
+                                        DesktopSocialLinkTransactionService
+                                                .PENDING_SESSION_ATTRIBUTE))
+                .isNull();
+        verify(desktopTransactions)
+                .completeFromBrowser("pending-transaction", "saml-e2e", authentication);
+        verify(service, never()).findOrCreate("saml-e2e", authentication);
     }
 
     @Test

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+	xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+	<changeSet id="039-create-account-passkey-registration-challenges" author="susimsek">
+		<createTable tableName="account_passkey_registration_challenges">
+			<column name="id" type="varchar(64)">
+				<constraints primaryKey="true" nullable="false" primaryKeyName="pk_account_passkey_registration_challenges"/>
+			</column>
+			<column name="username" type="varchar(200)"><constraints nullable="false"/></column>
+			<column name="options" type="varchar(32000)"><constraints nullable="false"/></column>
+			<column name="expires_at" type="timestamp"><constraints nullable="false"/></column>
+			<column name="version" type="bigint" defaultValueNumeric="0"><constraints nullable="false"/></column>
+		</createTable>
+		<createIndex tableName="account_passkey_registration_challenges" indexName="ix_account_passkey_registration_challenge_expiry">
+			<column name="expires_at"/>
+		</createIndex>
+	</changeSet>
+</databaseChangeLog>

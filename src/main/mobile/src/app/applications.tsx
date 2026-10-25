@@ -7,14 +7,17 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppIcon } from "@/components/AppIcon";
 import { AccountTabBar } from "@/components/AccountTabBar";
+import { AccountPagination } from "@/components/AccountPagination";
 import { useMobileNotice } from "@/components/MobileNoticeProvider";
 import {
+  approveCibaRequestWithMfa,
   decideCibaRequest,
   listAccountApplications,
   listCibaRequests,
@@ -42,78 +45,198 @@ export default function ApplicationsScreen() {
   const { session, status, refreshSession } = useMobileAuth();
   const { showNotice } = useMobileNotice();
   const [applications, setApplications] = useState<AccountApplication[]>([]);
+  const [applicationsPage, setApplicationsPage] = useState<{
+    number: number;
+    totalPages: number;
+  } | null>(null);
   const [offlineSessions, setOfflineSessions] = useState<
     AccountOfflineSession[]
   >([]);
+  const [offlinePage, setOfflinePage] = useState<{
+    number: number;
+    totalPages: number;
+  } | null>(null);
   const [cibaRequests, setCibaRequests] = useState<CibaPendingRequest[]>([]);
+  const [cibaPage, setCibaPage] = useState<{
+    number: number;
+    totalPages: number;
+  } | null>(null);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
   const [offlineLoading, setOfflineLoading] = useState(false);
+  const [cibaLoading, setCibaLoading] = useState(false);
+  const [applicationsPageDirection, setApplicationsPageDirection] = useState<
+    "next" | "previous" | null
+  >(null);
+  const [offlinePageDirection, setOfflinePageDirection] = useState<
+    "next" | "previous" | null
+  >(null);
+  const [cibaPageDirection, setCibaPageDirection] = useState<
+    "next" | "previous" | null
+  >(null);
   const [applicationsError, setApplicationsError] = useState(false);
   const [offlineError, setOfflineError] = useState(false);
-  const [cibaLoading, setCibaLoading] = useState(false);
   const [cibaError, setCibaError] = useState(false);
   const [cibaBusy, setCibaBusy] = useState<{
     authReqId: string;
     decision: "approve" | "deny";
   } | null>(null);
+  const [cibaMfaCodes, setCibaMfaCodes] = useState<Record<string, string>>({});
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const mutationInFlight = useRef(false);
+  const pageRequestsInFlight = useRef({
+    applications: false,
+    offline: false,
+    ciba: false,
+  });
+  const pageNumbers = useRef({ applications: 0, offline: 0, ciba: 0 });
 
-  const loadData = useCallback(
-    async (retry = false) => {
-      if (!session) return;
+  const loadApplicationsPage = useCallback(
+    async (
+      requestedPage: number,
+      retry = false,
+      direction: "next" | "previous" | null = null,
+    ) => {
+      if (!session || pageRequestsInFlight.current.applications) return;
+      pageRequestsInFlight.current.applications = true;
       setApplicationsLoading(true);
-      setOfflineLoading(true);
-      setCibaLoading(true);
+      setApplicationsPageDirection(direction);
       setApplicationsError(false);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) throw new Error("No active session");
+        const tokenOptions = {
+          page: requestedPage,
+          refreshAccessToken: async () =>
+            (await refreshSession(true))?.accessToken ?? null,
+        };
+        let page = await listAccountApplications(
+          currentSession.accessToken,
+          tokenOptions,
+        );
+        if (requestedPage > 0 && requestedPage >= page.totalPages) {
+          page = await listAccountApplications(currentSession.accessToken, {
+            ...tokenOptions,
+            page: Math.max(0, page.totalPages - 1),
+          });
+        }
+        setApplications(page.content ?? []);
+        pageNumbers.current.applications = page.number;
+        setApplicationsPage({
+          number: page.number,
+          totalPages: page.totalPages,
+        });
+      } catch {
+        setApplicationsError(true);
+      } finally {
+        setApplicationsLoading(false);
+        setApplicationsPageDirection(null);
+        pageRequestsInFlight.current.applications = false;
+      }
+    },
+    [refreshSession, session],
+  );
+
+  const loadOfflinePage = useCallback(
+    async (
+      requestedPage: number,
+      retry = false,
+      direction: "next" | "previous" | null = null,
+    ) => {
+      if (!session || pageRequestsInFlight.current.offline) return;
+      pageRequestsInFlight.current.offline = true;
+      setOfflineLoading(true);
+      setOfflinePageDirection(direction);
       setOfflineError(false);
+      try {
+        const currentSession = retry
+          ? await refreshSession(true)
+          : await refreshSession();
+        if (!currentSession) throw new Error("No active session");
+        const tokenOptions = {
+          page: requestedPage,
+          refreshAccessToken: async () =>
+            (await refreshSession(true))?.accessToken ?? null,
+        };
+        let page = await listOfflineSessions(
+          currentSession.accessToken,
+          tokenOptions,
+        );
+        if (requestedPage > 0 && requestedPage >= page.totalPages) {
+          page = await listOfflineSessions(currentSession.accessToken, {
+            ...tokenOptions,
+            page: Math.max(0, page.totalPages - 1),
+          });
+        }
+        setOfflineSessions(page.content ?? []);
+        pageNumbers.current.offline = page.number;
+        setOfflinePage({ number: page.number, totalPages: page.totalPages });
+      } catch {
+        setOfflineError(true);
+      } finally {
+        setOfflineLoading(false);
+        setOfflinePageDirection(null);
+        pageRequestsInFlight.current.offline = false;
+      }
+    },
+    [refreshSession, session],
+  );
+
+  const loadCibaPage = useCallback(
+    async (
+      requestedPage: number,
+      retry = false,
+      direction: "next" | "previous" | null = null,
+    ) => {
+      if (!session || pageRequestsInFlight.current.ciba) return;
+      pageRequestsInFlight.current.ciba = true;
+      setCibaLoading(true);
+      setCibaPageDirection(direction);
       setCibaError(false);
       try {
         const currentSession = retry
           ? await refreshSession(true)
           : await refreshSession();
-        if (!currentSession) {
-          setApplicationsError(true);
-          setOfflineError(true);
-          setCibaError(true);
-          return;
-        }
+        if (!currentSession) throw new Error("No active session");
         const tokenOptions = {
+          page: requestedPage,
           refreshAccessToken: async () =>
             (await refreshSession(true))?.accessToken ?? null,
         };
-        const [applicationResult, offlineResult, cibaResult] =
-          await Promise.allSettled([
-            listAccountApplications(currentSession.accessToken, tokenOptions),
-            listOfflineSessions(currentSession.accessToken, tokenOptions),
-            listCibaRequests(currentSession.accessToken, tokenOptions),
-          ]);
-        if (applicationResult.status === "fulfilled") {
-          setApplications(applicationResult.value.content ?? []);
-        } else {
-          setApplicationsError(true);
+        let page = await listCibaRequests(
+          currentSession.accessToken,
+          tokenOptions,
+        );
+        if (requestedPage > 0 && requestedPage >= page.totalPages) {
+          page = await listCibaRequests(currentSession.accessToken, {
+            ...tokenOptions,
+            page: Math.max(0, page.totalPages - 1),
+          });
         }
-        if (offlineResult.status === "fulfilled") {
-          setOfflineSessions(offlineResult.value.content ?? []);
-        } else {
-          setOfflineError(true);
-        }
-        if (cibaResult.status === "fulfilled") {
-          setCibaRequests(cibaResult.value.content ?? []);
-        } else {
-          setCibaError(true);
-        }
+        setCibaRequests(page.content ?? []);
+        pageNumbers.current.ciba = page.number;
+        setCibaPage({ number: page.number, totalPages: page.totalPages });
       } catch {
-        setApplicationsError(true);
-        setOfflineError(true);
         setCibaError(true);
       } finally {
-        setApplicationsLoading(false);
-        setOfflineLoading(false);
         setCibaLoading(false);
+        setCibaPageDirection(null);
+        pageRequestsInFlight.current.ciba = false;
       }
     },
     [refreshSession, session],
+  );
+
+  const loadData = useCallback(
+    async (retry = false) => {
+      await Promise.all([
+        loadApplicationsPage(pageNumbers.current.applications, retry),
+        loadOfflinePage(pageNumbers.current.offline, retry),
+        loadCibaPage(pageNumbers.current.ciba, retry),
+      ]);
+    },
+    [loadApplicationsPage, loadCibaPage, loadOfflinePage],
   );
 
   useEffect(() => {
@@ -147,7 +270,7 @@ export default function ApplicationsScreen() {
               (await refreshSession(true))?.accessToken ?? null,
           },
         );
-        await loadData(true);
+        await loadApplicationsPage(pageNumbers.current.applications, true);
         showNotice({
           kind: "success",
           message: dictionary.revokeApplicationSuccess,
@@ -166,7 +289,7 @@ export default function ApplicationsScreen() {
       busyKey,
       dictionary.revokeApplicationError,
       dictionary.revokeApplicationSuccess,
-      loadData,
+      loadApplicationsPage,
       refreshSession,
       showNotice,
       session,
@@ -196,7 +319,7 @@ export default function ApplicationsScreen() {
               (await refreshSession(true))?.accessToken ?? null,
           },
         );
-        await loadData(true);
+        await loadOfflinePage(pageNumbers.current.offline, true);
         showNotice({
           kind: "success",
           message: dictionary.revokeOfflineSessionSuccess,
@@ -215,7 +338,7 @@ export default function ApplicationsScreen() {
       busyKey,
       dictionary.revokeOfflineSessionError,
       dictionary.revokeOfflineSessionSuccess,
-      loadData,
+      loadOfflinePage,
       refreshSession,
       showNotice,
       session,
@@ -223,11 +346,16 @@ export default function ApplicationsScreen() {
   );
 
   const decideCiba = useCallback(
-    async (request: CibaPendingRequest, decision: "approve" | "deny") => {
+    async (
+      request: CibaPendingRequest,
+      decision: "approve" | "deny",
+      mfaCode?: string,
+    ) => {
       if (!session || busyKey || mutationInFlight.current) return;
       if (
         decision === "approve" &&
-        (request.mfaRequired || request.stepUpRequired)
+        (request.mfaRequired || request.stepUpRequired) &&
+        !mfaCode
       ) {
         return;
       }
@@ -244,13 +372,30 @@ export default function ApplicationsScreen() {
           });
           return;
         }
-        await decideCibaRequest(currentSession.accessToken, request, decision, {
+        const requestOptions = {
           refreshAccessToken: async () =>
             (await refreshSession(true))?.accessToken ?? null,
-        });
-        setCibaRequests((current) =>
-          current.filter((item) => item.authReqId !== request.authReqId),
-        );
+        };
+        if (decision === "approve" && mfaCode) {
+          await approveCibaRequestWithMfa(
+            currentSession.accessToken,
+            request,
+            mfaCode,
+            requestOptions,
+          );
+          setCibaMfaCodes((current) => ({
+            ...current,
+            [request.authReqId]: "",
+          }));
+        } else {
+          await decideCibaRequest(
+            currentSession.accessToken,
+            request,
+            decision,
+            requestOptions,
+          );
+        }
+        await loadCibaPage(pageNumbers.current.ciba);
         showNotice({
           kind: "success",
           message:
@@ -266,7 +411,7 @@ export default function ApplicationsScreen() {
         mutationInFlight.current = false;
       }
     },
-    [busyKey, dictionary, refreshSession, session, showNotice],
+    [busyKey, dictionary, loadCibaPage, refreshSession, session, showNotice],
   );
 
   const confirmApplication = (application: AccountApplication) => {
@@ -340,7 +485,7 @@ export default function ApplicationsScreen() {
             title={dictionary.applicationsTitle}
           />
           {(() => {
-            if (applicationsLoading) {
+            if (applicationsLoading && !applicationsPage) {
               return (
                 <ActivityIndicator
                   color={palette.primary}
@@ -353,7 +498,12 @@ export default function ApplicationsScreen() {
                   <RetryRow
                     label={dictionary.applicationsError}
                     retry={dictionary.sessionsRetry}
-                    onPress={() => void loadData(true)}
+                    onPress={() =>
+                      void loadApplicationsPage(
+                        pageNumbers.current.applications,
+                        true,
+                      )
+                    }
                     palette={palette}
                   />
                 );
@@ -394,6 +544,27 @@ export default function ApplicationsScreen() {
               }
             }
           })()}
+          {!applicationsError && applicationsPage ? (
+            <AccountPagination
+              loading={applicationsLoading}
+              loadingDirection={applicationsPageDirection}
+              onNext={() =>
+                void loadApplicationsPage(
+                  applicationsPage.number + 1,
+                  false,
+                  "next",
+                )
+              }
+              onPrevious={() =>
+                void loadApplicationsPage(
+                  applicationsPage.number - 1,
+                  false,
+                  "previous",
+                )
+              }
+              page={applicationsPage}
+            />
+          ) : null}
 
           <SectionHeader
             palette={palette}
@@ -401,7 +572,7 @@ export default function ApplicationsScreen() {
             help={dictionary.offlineSessionsHelp}
           />
           {(() => {
-            if (offlineLoading) {
+            if (offlineLoading && !offlinePage) {
               return (
                 <ActivityIndicator
                   color={palette.primary}
@@ -414,7 +585,9 @@ export default function ApplicationsScreen() {
                   <RetryRow
                     label={dictionary.offlineSessionsError}
                     retry={dictionary.sessionsRetry}
-                    onPress={() => void loadData(true)}
+                    onPress={() =>
+                      void loadOfflinePage(pageNumbers.current.offline, true)
+                    }
                     palette={palette}
                   />
                 );
@@ -466,6 +639,19 @@ export default function ApplicationsScreen() {
               }
             }
           })()}
+          {!offlineError && offlinePage ? (
+            <AccountPagination
+              loading={offlineLoading}
+              loadingDirection={offlinePageDirection}
+              onNext={() =>
+                void loadOfflinePage(offlinePage.number + 1, false, "next")
+              }
+              onPrevious={() =>
+                void loadOfflinePage(offlinePage.number - 1, false, "previous")
+              }
+              page={offlinePage}
+            />
+          ) : null}
 
           <SectionHeader
             palette={palette}
@@ -473,7 +659,7 @@ export default function ApplicationsScreen() {
             help={dictionary.cibaHelp}
           />
           {(() => {
-            if (cibaLoading) {
+            if (cibaLoading && !cibaPage) {
               return (
                 <ActivityIndicator
                   color={palette.primary}
@@ -486,7 +672,9 @@ export default function ApplicationsScreen() {
                   <RetryRow
                     label={dictionary.cibaLoadError}
                     retry={dictionary.sessionsRetry}
-                    onPress={() => void loadData(true)}
+                    onPress={() =>
+                      void loadCibaPage(pageNumbers.current.ciba, true)
+                    }
                     palette={palette}
                   />
                 );
@@ -542,6 +730,31 @@ export default function ApplicationsScreen() {
                             {stepUpDescription}
                           </Text>
                         ) : null}
+                        {requiresStepUp ? (
+                          <TextInput
+                            accessibilityLabel={dictionary.mfaCode}
+                            autoComplete="one-time-code"
+                            keyboardType="number-pad"
+                            maxLength={8}
+                            onChangeText={(value) =>
+                              setCibaMfaCodes((current) => ({
+                                ...current,
+                                [request.authReqId]: value.replace(/\D/g, ""),
+                              }))
+                            }
+                            placeholder={dictionary.mfaCode}
+                            placeholderTextColor={palette.textMuted}
+                            style={[
+                              styles.cibaMfaCode,
+                              {
+                                backgroundColor: palette.surface,
+                                borderColor: palette.border,
+                                color: palette.text,
+                              },
+                            ]}
+                            value={cibaMfaCodes[request.authReqId] ?? ""}
+                          />
+                        ) : null}
                         <View style={styles.cibaActions}>
                           <ActionButton
                             label={dictionary.cibaApprove}
@@ -549,8 +762,22 @@ export default function ApplicationsScreen() {
                               cibaBusy?.authReqId === request.authReqId &&
                               cibaBusy.decision === "approve"
                             }
-                            disabled={Boolean(busyKey) || requiresStepUp}
-                            onPress={() => void decideCiba(request, "approve")}
+                            disabled={
+                              Boolean(busyKey) ||
+                              (requiresStepUp &&
+                                !/^\d{6,8}$/.test(
+                                  cibaMfaCodes[request.authReqId] ?? "",
+                                ))
+                            }
+                            onPress={() =>
+                              void decideCiba(
+                                request,
+                                "approve",
+                                requiresStepUp
+                                  ? cibaMfaCodes[request.authReqId]
+                                  : undefined,
+                              )
+                            }
                             palette={palette}
                           />
                           <ActionButton
@@ -571,6 +798,19 @@ export default function ApplicationsScreen() {
               }
             }
           })()}
+          {!cibaError && cibaPage ? (
+            <AccountPagination
+              loading={cibaLoading}
+              loadingDirection={cibaPageDirection}
+              onNext={() =>
+                void loadCibaPage(cibaPage.number + 1, false, "next")
+              }
+              onPrevious={() =>
+                void loadCibaPage(cibaPage.number - 1, false, "previous")
+              }
+              page={cibaPage}
+            />
+          ) : null}
         </ScrollView>
         <AccountTabBar active="applications" />
       </View>
@@ -693,4 +933,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   cibaActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  cibaMfaCode: {
+    borderRadius: radii.md,
+    borderWidth: 1,
+    fontSize: 18,
+    letterSpacing: 4,
+    marginTop: spacing.md,
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+  },
 });

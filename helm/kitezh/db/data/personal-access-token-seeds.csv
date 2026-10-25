@@ -1,0 +1,3 @@
+seed_key;username;name;description;expiration
+demo-admin-mcp;admin;MCP personal access token;Demo MCP access token for admin;never
+demo-user-mcp;user;MCP personal access token;Demo MCP access token for user;never

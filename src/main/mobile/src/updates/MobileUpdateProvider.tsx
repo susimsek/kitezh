@@ -57,6 +57,7 @@ export function MobileUpdateProvider({ children }: PropsWithChildren) {
   const [permissionRequired, setPermissionRequired] = useState(false);
   const [checked, setChecked] = useState(false);
   const checkingRef = useRef(false);
+  const installingRef = useRef(false);
   const lastCheckAt = useRef(0);
   const promptedVersion = useRef<string | null>(null);
 
@@ -115,7 +116,8 @@ export function MobileUpdateProvider({ children }: PropsWithChildren) {
   }, [checkForUpdates]);
 
   const installOrOpenUpdate = useCallback(async () => {
-    if (installing || !release) return;
+    if (installingRef.current || !release) return;
+    installingRef.current = true;
     setError(null);
     setPermissionRequired(false);
     setInstalling(true);
@@ -125,6 +127,7 @@ export function MobileUpdateProvider({ children }: PropsWithChildren) {
       } catch {
         setError("download");
       } finally {
+        installingRef.current = false;
         setInstalling(false);
       }
       return;
@@ -142,9 +145,10 @@ export function MobileUpdateProvider({ children }: PropsWithChildren) {
       setError("download");
       setDownloadPercent(null);
     } finally {
+      installingRef.current = false;
       setInstalling(false);
     }
-  }, [installing, platform, release]);
+  }, [platform, release]);
 
   const value = useMemo<MobileUpdateContextValue>(
     () => ({

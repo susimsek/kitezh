@@ -57,6 +57,24 @@ public class DesktopSocialLinkTransactionService {
             String provider,
             DesktopSocialLinkStartRequestDTO request,
             String baseUrl) {
+        return start(username, provider, request, baseUrl, "desktop");
+    }
+
+    @Transactional
+    public DesktopSocialLinkStartResponseDTO startMobile(
+            String username,
+            String provider,
+            DesktopSocialLinkStartRequestDTO request,
+            String baseUrl) {
+        return start(username, provider, request, baseUrl, "mobile");
+    }
+
+    private DesktopSocialLinkStartResponseDTO start(
+            String username,
+            String provider,
+            DesktopSocialLinkStartRequestDTO request,
+            String baseUrl,
+            String client) {
         String normalizedProvider = normalizeProvider(provider);
         if (!socialLoginService.isProviderEnabled(normalizedProvider)
                 || !isProviderAvailable(normalizedProvider)) {
@@ -82,7 +100,9 @@ public class DesktopSocialLinkTransactionService {
                 baseUrl
                         + "/account/social-links/"
                         + encode(normalizedProvider)
-                        + "/desktop/authorize?transaction="
+                        + "/"
+                        + client
+                        + "/authorize?transaction="
                         + encode(authorizationToken);
         return new DesktopSocialLinkStartResponseDTO(
                 authorizationUrl, request.state(), transaction.getExpiresAt());
@@ -157,10 +177,12 @@ public class DesktopSocialLinkTransactionService {
             throw ApiException.conflict(
                     ApiErrorCode.CONFLICT, "Desktop social-link transaction has expired");
         }
-        if (transaction.getConsumedAt() == null) {
-            transaction.setConsumedAt(Instant.now());
-            transactionRepository.save(transaction);
+        if (transaction.getConsumedAt() != null) {
+            throw ApiException.conflict(
+                    ApiErrorCode.CONFLICT, "Native social-link transaction was already consumed");
         }
+        transaction.setConsumedAt(Instant.now());
+        transactionRepository.save(transaction);
         return new DesktopSocialLinkCompleteResponseDTO(transaction.getProvider(), true);
     }
 

@@ -53,7 +53,15 @@ public class LoggingProperties {
     public static class Obfuscate {
 
         private String replacement = "***";
-        private List<String> headers = new ArrayList<>(List.of("Authorization", "Cookie"));
+        private List<String> headers =
+                new ArrayList<>(
+                        List.of(
+                                "Authorization",
+                                "Cookie",
+                                "Set-Cookie",
+                                "Proxy-Authorization",
+                                "DPoP",
+                                "X-Api-Key"));
         private List<String> bodyFields =
                 new ArrayList<>(
                         List.of(
@@ -69,6 +77,9 @@ public class LoggingProperties {
                                 "api_key",
                                 "assertion",
                                 "saml_response",
+                                "samlresponse",
+                                "samlrequest",
+                                "relaystate",
                                 "private_key",
                                 "code",
                                 "code_verifier",
@@ -98,6 +109,9 @@ public class LoggingProperties {
                                 "secret",
                                 "api_key",
                                 "assertion",
+                                "samlresponse",
+                                "samlrequest",
+                                "relaystate",
                                 "code",
                                 "code_verifier",
                                 "state",
@@ -112,6 +126,5 @@ public class LoggingProperties {
                                 "captchaToken",
                                 "response",
                                 "key"));
-        private List<String> cookies = new ArrayList<>(List.of("SESSION"));
     }
 }

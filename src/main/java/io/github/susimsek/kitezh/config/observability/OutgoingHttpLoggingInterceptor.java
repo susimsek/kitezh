@@ -10,7 +10,6 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -25,78 +24,12 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
     private static final String DIRECTION = "direction";
     private static final String OUTBOUND = "outbound";
     private static final String TYPE = "type";
-    private static final String AUTHORIZATION = "authorization";
     private static final String RESPONSE = "response";
     private static final String ORIGIN = "origin";
     private static final String HTTP_METHOD = "http.method";
     private static final String HTTP_TARGET = "http.target";
     private static final Logger LOGGER =
             LoggerFactory.getLogger("io.github.susimsek.kitezh.http.client");
-    private static final Set<String> ALWAYS_MASKED_HEADERS =
-            Set.of(
-                    AUTHORIZATION,
-                    "cookie",
-                    "set-cookie",
-                    "proxy-authorization",
-                    "dpop",
-                    "x-api-key");
-    private static final Set<String> ALWAYS_MASKED_BODY_FIELDS =
-            Set.of(
-                    "access_token",
-                    "refresh_token",
-                    "id_token",
-                    "client_secret",
-                    "password",
-                    AUTHORIZATION,
-                    "cookie",
-                    "token",
-                    "secret",
-                    "api_key",
-                    "assertion",
-                    "saml_response",
-                    "private_key",
-                    "code",
-                    "code_verifier",
-                    "captchatoken",
-                    RESPONSE,
-                    "sitekey",
-                    "apikey",
-                    "auth_req_id",
-                    "client_notification_token",
-                    "id_token_hint",
-                    "login_hint_token",
-                    "user_code",
-                    "dpop",
-                    "dpop_proof",
-                    "jwk");
-    private static final Set<String> ALWAYS_MASKED_PARAMETERS =
-            Set.of(
-                    "access_token",
-                    "refresh_token",
-                    "id_token",
-                    "client_secret",
-                    "client_assertion",
-                    "password",
-                    AUTHORIZATION,
-                    "token",
-                    "secret",
-                    "api_key",
-                    "assertion",
-                    "code",
-                    "code_verifier",
-                    "state",
-                    "nonce",
-                    "request",
-                    "request_uri",
-                    "id_token_hint",
-                    "auth_req_id",
-                    "client_notification_token",
-                    "login_hint_token",
-                    "user_code",
-                    "captchatoken",
-                    RESPONSE,
-                    "key");
-
     private final HttpLoggingLevel level;
     private final int maxBodyBytes;
     private final Set<String> excludePaths;
@@ -127,17 +60,15 @@ public final class OutgoingHttpLoggingInterceptor implements ClientHttpRequestIn
                         .filter(path -> !path.isEmpty())
                         .collect(Collectors.toUnmodifiableSet());
         this.maskedHeaders =
-                Stream.concat(ALWAYS_MASKED_HEADERS.stream(), obfuscate.getHeaders().stream())
+                obfuscate.getHeaders().stream()
                         .map(header -> header.toLowerCase(Locale.ROOT))
                         .collect(Collectors.toUnmodifiableSet());
         this.maskedBodyFields =
-                Stream.concat(
-                                ALWAYS_MASKED_BODY_FIELDS.stream(),
-                                obfuscate.getBodyFields().stream())
+                obfuscate.getBodyFields().stream()
                         .map(field -> field.toLowerCase(Locale.ROOT))
                         .collect(Collectors.toUnmodifiableSet());
         this.maskedParameters =
-                Stream.concat(ALWAYS_MASKED_PARAMETERS.stream(), obfuscate.getParameters().stream())
+                obfuscate.getParameters().stream()
                         .map(parameter -> parameter.toLowerCase(Locale.ROOT))
                         .collect(Collectors.toUnmodifiableSet());
     }

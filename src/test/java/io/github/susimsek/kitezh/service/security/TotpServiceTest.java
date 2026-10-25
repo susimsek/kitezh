@@ -47,6 +47,18 @@ class TotpServiceTest {
     }
 
     @Test
+    void rejectsMissingCodesUnsupportedDigitsAndNegativeWindows() {
+        String secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
+
+        assertThat(service.matchingCounterAt(secret, null, "SHA1", 6, 30, 0, Instant.EPOCH))
+                .isEmpty();
+        assertThat(service.matchingCounterAt(secret, "1234567", "SHA1", 7, 30, 0, Instant.EPOCH))
+                .isEmpty();
+        assertThat(service.matchingCounterAt(secret, "123456", "SHA1", 6, 30, -1, Instant.EPOCH))
+                .isEmpty();
+    }
+
+    @Test
     void rejectsIncorrectCodeWithConfiguredLength() {
         assertThat(
                         service.matchesAt(

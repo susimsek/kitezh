@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.web.admin.validation;
 import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import io.github.susimsek.kitezh.validation.validator.AdminClientConfigurationValidator;
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
 import java.lang.annotation.Documented;

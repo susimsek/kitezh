@@ -9,6 +9,7 @@ public enum ApiErrorCode {
     FORBIDDEN("forbidden", "You are not allowed to perform this operation."),
     INTERNAL_ERROR("internal_error", "An unexpected error occurred."),
     RATE_LIMIT_EXCEEDED("rate_limit_exceeded", "Too many requests. Please try again later."),
+    AUTHENTICATION_FAILED("authentication_failed", "Invalid username or password."),
     INVALID_CURRENT_PASSWORD("invalid_current_password", "Current password is invalid."),
     REAUTHENTICATION_REQUIRED(
             "reauthentication_required",
@@ -73,6 +74,12 @@ public enum ApiErrorCode {
     CLIENT_ROLE_COMPOSITE_CYCLE(
             "client_role_composite_cycle",
             "A client role composite relationship would create a cycle."),
+    AUTHZ_INVALID_REQUEST("authz_invalid_request", "The authorization request is invalid."),
+    AUTHZ_RESOURCE_DUPLICATE("authz_resource_duplicate", "Protected resource already exists."),
+    AUTHZ_SCOPE_ASSIGNED("authz_scope_assigned", "The scope is still used by a permission."),
+    AUTHZ_POLICY_DUPLICATE("authz_policy_duplicate", "Authorization policy already exists."),
+    AUTHZ_PERMISSION_DUPLICATE(
+            "authz_permission_duplicate", "Authorization permission already exists."),
     GROUP_DUPLICATE_NAME("group_duplicate_name", "Group name is already registered."),
     GROUP_HAS_CHILDREN(
             "group_has_children", "Move or delete child groups before deleting this group."),

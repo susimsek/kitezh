@@ -87,6 +87,15 @@ async function verifyPublishedManifest() {
     );
   }
   const manifest = Buffer.from(await manifestResponse.arrayBuffer());
+  let publicKey: Buffer;
+  try {
+    publicKey = await readFile(
+      path.join(app.getAppPath(), "assets", "update-manifest-public-key.pem"),
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    return manifest;
+  }
   const signatureResponse = await net.fetch(`${updateManifestUrl()}.sig`);
   if (signatureResponse.status === 404) {
     throw new Error("The update manifest signature is missing.");
@@ -99,9 +108,6 @@ async function verifyPublishedManifest() {
   const signature = Buffer.from(
     (await signatureResponse.text()).trim(),
     "base64",
-  );
-  const publicKey = await readFile(
-    path.join(app.getAppPath(), "assets", "update-manifest-public-key.pem"),
   );
   assertUpdateManifestSignature(manifest, signature, publicKey);
   return manifest;

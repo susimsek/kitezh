@@ -4,6 +4,7 @@ import io.github.susimsek.kitezh.dto.admin.AdminClientCreatedDTO;
 import io.github.susimsek.kitezh.dto.admin.AdminClientDTO;
 import io.github.susimsek.kitezh.security.ClientSecuritySettings;
 import io.github.susimsek.kitezh.security.OfflineAccessSettings;
+import java.time.Duration;
 import java.util.stream.Collectors;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;
@@ -13,6 +14,10 @@ import org.springframework.security.oauth2.server.authorization.client.Registere
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface AdminClientMapper {
+
+    String AUTHORIZATION_CODE_TTL = "settings.token.authorization-code-time-to-live";
+    String ACCESS_TOKEN_TTL = "settings.token.access-token-time-to-live";
+    String REFRESH_TOKEN_TTL = "settings.token.refresh-token-time-to-live";
 
     default AdminClientDTO toDTO(RegisteredClient client) {
         return toDTO(client, false, null);
@@ -44,9 +49,9 @@ public interface AdminClientMapper {
                 ClientSecuritySettings.cibaDeliveryMode(client),
                 ClientSecuritySettings.cibaNotificationEndpoint(client),
                 false,
-                client.getTokenSettings().getAuthorizationCodeTimeToLive(),
-                client.getTokenSettings().getAccessTokenTimeToLive(),
-                client.getTokenSettings().getRefreshTokenTimeToLive(),
+                durationSetting(client, AUTHORIZATION_CODE_TTL),
+                durationSetting(client, ACCESS_TOKEN_TTL),
+                durationSetting(client, REFRESH_TOKEN_TTL),
                 serviceAccountEnabled,
                 serviceAccountUsername,
                 ClientSecuritySettings.isEnabled(client),
@@ -74,6 +79,9 @@ public interface AdminClientMapper {
 
     private static java.time.Duration durationSetting(RegisteredClient client, String key) {
         Object value = client.getTokenSettings().getSettings().get(key);
+        if (value instanceof Duration duration) {
+            return duration;
+        }
         if (value instanceof String string) {
             try {
                 return java.time.Duration.parse(string);

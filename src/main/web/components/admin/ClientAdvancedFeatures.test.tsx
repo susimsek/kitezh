@@ -128,6 +128,43 @@ it("uses the standard audience claim for an audience mapper", async () => {
   );
 });
 
+it("validates mapper source, claim name, and token target before saving", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockResolvedValue({
+    status: 200,
+    data: { content: [], totalPages: 0, totalElements: 0 },
+  } as never);
+
+  render(<ClientMappers clientId="client-1" dictionary={en} />);
+  await screen.findByText(en.admin.clients.mappers.empty);
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.type), {
+    target: { value: "user-attribute" },
+  });
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.name), {
+    target: { value: "Invalid mapper" },
+  });
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.source), {
+    target: { value: "" },
+  });
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.claimName), {
+    target: { value: "" },
+  });
+  const accessTokenSwitch = screen
+    .getByText(en.admin.clients.mappers.accessToken)
+    .parentElement?.querySelector("input");
+  if (!accessTokenSwitch) throw new Error("Access-token switch was not rendered");
+  fireEvent.click(accessTokenSwitch);
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.save }));
+
+  expect(await screen.findByText(en.admin.clients.mappers.sourceRequired)).toBeVisible();
+  expect(screen.getByText(en.admin.common.validation.required)).toBeVisible();
+  expect(screen.getByText(en.admin.clients.mappers.targetRequired)).toBeVisible();
+  expect(request).not.toHaveBeenCalledWith(
+    "admin-token",
+    expect.objectContaining({ method: "POST" }),
+  );
+});
+
 it("evaluates requested scopes and renders the preview", async () => {
   const request = jest.mocked(adminRequest);
   request.mockResolvedValue({
@@ -432,4 +469,147 @@ it("does not mutate a service account without client-management access", async (
       expect.objectContaining({ method: "POST" }),
     ),
   );
+});
+
+it("edits a mapper, preserves it after a rejected update, and deletes it after retry", async () => {
+  const request = jest.mocked(adminRequest);
+  const mapper = {
+    id: 12,
+    name: "Custom claim",
+    mapperType: "user-attribute",
+    source: "department",
+    claimName: "department",
+    addToIdToken: true,
+    addToAccessToken: false,
+    value: null,
+    priority: 200,
+  };
+  let updateStatus = 400;
+  let deleteStatus = 500;
+  let deleted = false;
+  request.mockImplementation(async (_token, config) => {
+    if (config.method === "PUT") return { status: updateStatus, data: mapper } as never;
+    if (config.method === "DELETE") {
+      if (deleteStatus < 300) deleted = true;
+      return { status: deleteStatus, data: null } as never;
+    }
+    return {
+      status: 200,
+      data: { content: deleted ? [] : [mapper], totalPages: 1, totalElements: deleted ? 0 : 1 },
+    } as never;
+  });
+
+  render(<ClientMappers clientId="client-1" dictionary={en} />);
+  expect(await screen.findByText("Custom claim")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: en.admin.clients.mappers.edit }));
+  expect(screen.getByRole("heading", { name: en.admin.clients.mappers.edit })).toBeVisible();
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.name), {
+    target: { value: "Updated claim" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.save }));
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "admin-token",
+      expect.objectContaining({
+        url: "/api/admin/clients/client-1/mappers/12",
+        method: "PUT",
+      }),
+    ),
+  );
+  expect(screen.getByRole("heading", { name: en.admin.clients.mappers.edit })).toBeVisible();
+  expect(mockAddAlert).not.toHaveBeenCalledWith(en.admin.clients.mappers.saved);
+
+  updateStatus = 200;
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.save }));
+  await waitFor(() => expect(mockAddAlert).toHaveBeenCalledWith(en.admin.clients.mappers.saved));
+  expect(await screen.findByText("Custom claim")).toBeVisible();
+  const deleteButton = screen.getByRole("button", { name: en.admin.clients.mappers.delete });
+  fireEvent.click(deleteButton);
+  await waitFor(() => expect(deleteButton).toBeEnabled());
+  expect(mockAddAlert).not.toHaveBeenCalledWith(en.admin.clients.mappers.deleted);
+
+  deleteStatus = 204;
+  fireEvent.click(deleteButton);
+  await waitFor(() => expect(mockAddAlert).toHaveBeenCalledWith(en.admin.clients.mappers.deleted));
+  expect(await screen.findByText(en.admin.clients.mappers.empty)).toBeVisible();
+});
+
+it("updates mapper field availability for mapper types and validates priority", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockResolvedValue({
+    status: 200,
+    data: { content: [], totalPages: 0, totalElements: 0 },
+  } as never);
+
+  render(<ClientMappers clientId="client-1" dictionary={en} />);
+  await screen.findByText(en.admin.clients.mappers.empty);
+  const type = screen.getByLabelText(en.admin.clients.mappers.type);
+  const source = screen.getByLabelText(en.admin.clients.mappers.source);
+  const claimName = screen.getByLabelText(en.admin.clients.mappers.claimName);
+  const value = screen.getByLabelText(en.admin.clients.mappers.value);
+
+  fireEvent.change(type, { target: { value: "group-membership" } });
+  expect(source).toBeDisabled();
+  expect(claimName).toBeEnabled();
+  expect(value).toBeDisabled();
+
+  fireEvent.change(type, { target: { value: "hardcoded-claim" } });
+  expect(source).toBeDisabled();
+  expect(claimName).toBeEnabled();
+  expect(value).toBeEnabled();
+
+  fireEvent.change(type, { target: { value: "audience-resolve" } });
+  expect(source).toBeDisabled();
+  expect(claimName).toBeDisabled();
+  expect(value).toBeDisabled();
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.name), {
+    target: { value: "Negative priority" },
+  });
+  fireEvent.change(screen.getByLabelText(en.admin.clients.mappers.priority), {
+    target: { value: "-1" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: en.admin.common.save }));
+
+  await waitFor(() =>
+    expect(screen.getByLabelText(en.admin.clients.mappers.priority)).toHaveClass("is-invalid"),
+  );
+  expect(request).not.toHaveBeenCalledWith(
+    "admin-token",
+    expect.objectContaining({ method: "POST" }),
+  );
+});
+
+it("hides mapper mutations in read-only mode and reports list load errors", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockResolvedValue({
+    status: 200,
+    data: {
+      content: [
+        {
+          id: 21,
+          name: "Read-only mapper",
+          mapperType: "username",
+          source: null,
+          claimName: "preferred_username",
+          addToIdToken: true,
+          addToAccessToken: true,
+          value: null,
+          priority: 100,
+        },
+      ],
+      totalPages: 1,
+      totalElements: 1,
+    },
+  } as never);
+
+  const view = render(<ClientMappers clientId="client-1" dictionary={en} readOnly />);
+  expect(await screen.findByText("Read-only mapper")).toBeVisible();
+  expect(screen.queryByRole("heading", { name: en.admin.clients.mappers.create })).toBeNull();
+  expect(screen.getByRole("button", { name: en.admin.clients.mappers.edit })).toBeDisabled();
+  expect(screen.getByRole("button", { name: en.admin.clients.mappers.delete })).toBeDisabled();
+  view.unmount();
+
+  request.mockResolvedValueOnce({ status: 503, data: null } as never);
+  render(<ClientMappers clientId="client-1" dictionary={en} />);
+  expect(await screen.findByText(en.admin.clients.mappers.loadError)).toBeVisible();
 });

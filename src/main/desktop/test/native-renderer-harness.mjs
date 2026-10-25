@@ -183,7 +183,7 @@ function makeResponse(path, method, body) {
     return {
       content: [
         {
-          id: "admin-notification-1",
+          id: "10000000-0000-4000-8000-000000000001",
           messageKey: "notificationAdminUserRegistered",
           createdAt: "2026-10-12T08:30:00Z",
           read: false,
@@ -370,10 +370,16 @@ async function renderConsole(consoleName = "account", options = {}) {
       },
     },
     auth: {
-      hasSession: async (requestedConsole) =>
-        options.hasSession === false || requestedConsole !== consoleName
+      hasSession: async (requestedConsole) => {
+        if (options.hasSessionFailure) throw new Error("session lookup failed");
+        if (options.sessionConsole)
+          return requestedConsole === options.sessionConsole
+            ? { console: requestedConsole }
+            : null;
+        return options.hasSession === false || requestedConsole !== consoleName
           ? null
-          : { console: consoleName },
+          : { console: consoleName };
+      },
       startLogin: async (requestedConsole) => {
         calls.push({ path: "start-login", method: requestedConsole });
         return options.startLogin?.(requestedConsole);
@@ -403,6 +409,8 @@ async function renderConsole(consoleName = "account", options = {}) {
         },
       },
     },
+    openExternal: async (url) =>
+      calls.push({ path: "open-external", method: url }),
     theme: {
       set: async (theme) => calls.push({ path: "theme", method: theme }),
       onChanged: (listener) => {
@@ -437,6 +445,7 @@ async function renderConsole(consoleName = "account", options = {}) {
     requestAnimationFrame: dom.window.requestAnimationFrame.bind(dom.window),
     cancelAnimationFrame: dom.window.cancelAnimationFrame.bind(dom.window),
     desktopApi: api,
+    confirm: options.confirm ?? (() => true),
     __KITEZH_NATIVE_BOOTSTRAP__: {
       locale: options.locale ?? "en",
       theme: options.theme ?? "light",
@@ -519,7 +528,7 @@ async function exerciseVisibleEditorActions(document) {
   const safeAction = document.defaultView.location.search.includes(
     "console=admin",
   )
-    ? /(?:toggle|edit|create|cancel|search|page|retry|select|filter|setup|start|refresh|generate|show|hide|copy|delete|revoke|reset|remove|rotate|enable|disable|unlock|mark|assign|permission|mapping|rename|upload)/
+    ? /(?:toggle|edit|create|cancel|search|page|retry|select|filter|setup|start|refresh|generate|show|hide|copy|delete|revoke|reset|remove|rotate|enable|disable|unlock|mark|read|assign|permission|mapping|rename|upload|open|detail|tab|back|close)/
     : /(?:toggle|edit|create|cancel|search|page|retry|select|filter|setup|start|refresh|generate|show|hide|copy)/;
   const visited = new Set();
   for (let count = 0; count < 30; count += 1) {

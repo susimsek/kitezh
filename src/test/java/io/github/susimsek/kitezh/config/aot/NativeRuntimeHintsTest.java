@@ -3,6 +3,7 @@ package io.github.susimsek.kitezh.config.aot;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
 
@@ -26,5 +27,23 @@ class NativeRuntimeHintsTest {
                         RuntimeHintsPredicates.resource()
                                 .forResource("templates/mail/passwordReset.html"))
                 .accepts(hints);
+    }
+
+    @Test
+    void registersDiscoveredConstraintValidatorConstructorsForNativeImages() {
+        RuntimeHints hints = new RuntimeHints();
+
+        new NativeRuntimeHints().registerHints(hints, getClass().getClassLoader());
+
+        var validatorTypes =
+                NativeRuntimeHints.findConstraintValidatorTypes(getClass().getClassLoader());
+        assertThat(validatorTypes).isNotEmpty();
+        validatorTypes.forEach(
+                validatorType ->
+                        assertThat(
+                                        hints.reflection()
+                                                .getTypeHint(validatorType)
+                                                .getMemberCategories())
+                                .contains(MemberCategory.INVOKE_DECLARED_CONSTRUCTORS));
     }
 }

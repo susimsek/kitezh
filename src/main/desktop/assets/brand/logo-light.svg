@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img">
+  <title>Kitezh</title>
+  <rect width="64" height="64" rx="14" fill="#0b2b69"/>
+  <defs>
+    <clipPath id="shield-light">
+      <path d="M32 8 52 15v14c0 13-8.5 24-20 29C20.5 53 12 42 12 29V15z"/>
+    </clipPath>
+  </defs>
+  <path d="M32 8 52 15v14c0 13-8.5 24-20 29C20.5 53 12 42 12 29V15z" fill="#f8fafc"/>
+  <path d="M32 8h20v21c0 13-8.5 24-20 29z" fill="#20d4b7" clip-path="url(#shield-light)"/>
+  <circle cx="32" cy="27" r="5.2" fill="#0b2b69"/>
+  <path d="M27.5 32h9l1.5 12h-12z" fill="#0b2b69"/>
+</svg>

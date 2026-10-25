@@ -103,6 +103,16 @@ class AdminClientMapperServiceTest {
         AdminClientMapperRequestDTO missingValue =
                 new AdminClientMapperRequestDTO(
                         "x", "hardcoded-claim", null, "claim", true, false, "", 1);
+        AdminClientMapperRequestDTO nullSource =
+                new AdminClientMapperRequestDTO(
+                        "x", "user-attribute", null, "department", true, false, null, 1);
+        AdminClientMapperRequestDTO nullValue =
+                new AdminClientMapperRequestDTO(
+                        "x", "hardcoded-claim", null, "claim", true, false, null, 1);
+        AdminClientMapperRequestDTO blankClaimName =
+                new AdminClientMapperRequestDTO("x", "email", null, " ", true, false, null, 1);
+        AdminClientMapperRequestDTO noTokenTarget =
+                new AdminClientMapperRequestDTO("x", "email", null, "email", false, false, null, 1);
 
         assertThatThrownBy(() -> service.create("client-1", null))
                 .isInstanceOf(ApiException.class)
@@ -116,6 +126,18 @@ class AdminClientMapperServiceTest {
         assertThatThrownBy(() -> service.create("client-1", missingValue))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("A value is required for this mapper type");
+        assertThatThrownBy(() -> service.create("client-1", nullSource))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A source is required for this mapper type");
+        assertThatThrownBy(() -> service.create("client-1", nullValue))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A value is required for this mapper type");
+        assertThatThrownBy(() -> service.create("client-1", blankClaimName))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("A claim name is required");
+        assertThatThrownBy(() -> service.create("client-1", noTokenTarget))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Select at least one token target");
     }
 
     private AdminClientMapperService service() {

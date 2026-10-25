@@ -1,6 +1,7 @@
 package io.github.susimsek.kitezh;
 
 import io.github.susimsek.kitezh.config.ApplicationProperties;
+import io.github.susimsek.kitezh.config.MobileCaptchaProperties;
 import io.github.susimsek.kitezh.config.aot.NativeRuntimeHints;
 import io.github.susimsek.kitezh.config.http.GitHubApiProperties;
 import io.github.susimsek.kitezh.config.observability.LoggingProperties;
@@ -19,6 +20,7 @@ import org.springframework.web.service.registry.ImportHttpServices;
 @SpringBootApplication
 @EnableConfigurationProperties({
     ApplicationProperties.class,
+    MobileCaptchaProperties.class,
     GitHubApiProperties.class,
     SocialLoginProperties.class,
     LoggingProperties.class

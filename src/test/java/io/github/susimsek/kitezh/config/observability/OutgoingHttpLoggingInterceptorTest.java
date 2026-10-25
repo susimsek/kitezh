@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 import ch.qos.logback.classic.Logger;
@@ -47,7 +48,7 @@ class OutgoingHttpLoggingInterceptorTest {
         LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
         properties.setLevel(HttpLoggingLevel.HEADERS);
         LoggingProperties.Obfuscate obfuscate = new LoggingProperties.Obfuscate();
-        obfuscate.setHeaders(List.of("X-Secret"));
+        obfuscate.setHeaders(List.of("X-Secret", "Authorization", "Set-Cookie"));
         MockClientHttpRequest request =
                 new MockClientHttpRequest(
                         HttpMethod.POST, URI.create("https://idp.example/token?code=secret"));
@@ -95,6 +96,65 @@ class OutgoingHttpLoggingInterceptorTest {
                                     .contains("X-Response=[visible]")
                                     .contains("Set-Cookie=***");
                         });
+    }
+
+    @Test
+    void logsOnlyResponseStatusAtBasicLevel() throws IOException {
+        LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
+        MockClientHttpRequest request =
+                new MockClientHttpRequest(HttpMethod.GET, URI.create("https://idp.example/status"));
+        MockClientHttpResponse response =
+                new MockClientHttpResponse("response-body".getBytes(StandardCharsets.UTF_8), 200);
+
+        new OutgoingHttpLoggingInterceptor(properties)
+                .intercept(request, new byte[0], (ignoredRequest, ignoredBody) -> response);
+
+        assertThat(appender.list).hasSize(2);
+        assertThat(appender.list.get(1).getFormattedMessage())
+                .contains("status=200")
+                .doesNotContain("headers=", "body=");
+    }
+
+    @Test
+    void bufferedResponseDelegatesMetadataAndCloseAndCanBeReadRepeatedly() throws IOException {
+        LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
+        properties.setLevel(HttpLoggingLevel.FULL);
+        OutgoingHttpLoggingInterceptor interceptor = new OutgoingHttpLoggingInterceptor(properties);
+        MockClientHttpRequest request =
+                new MockClientHttpRequest(HttpMethod.GET, URI.create("https://idp.example/user"));
+        byte[] body = "{\"name\":\"Ada\"}".getBytes(StandardCharsets.UTF_8);
+        MockClientHttpResponse response = spy(new MockClientHttpResponse(body, 200));
+        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        response.getHeaders().setContentLength(body.length);
+
+        var buffered =
+                interceptor.intercept(
+                        request, new byte[0], (ignoredRequest, ignoredBody) -> response);
+
+        assertThat(buffered.getStatusCode().value()).isEqualTo(200);
+        assertThat(buffered.getStatusText()).isEqualTo("OK");
+        assertThat(buffered.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
+        assertThat(buffered.getBody().readAllBytes()).isEqualTo(buffered.getBody().readAllBytes());
+        buffered.close();
+        verify(response).close();
+    }
+
+    @Test
+    void masksEncodedQueryParameterNamesAndPreservesMalformedEscapes() throws IOException {
+        LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
+        MockClientHttpRequest request =
+                new MockClientHttpRequest(
+                        HttpMethod.GET,
+                        URI.create("https://idp.example/?client%5Fsecret=visible&%C3=value"));
+        MockClientHttpResponse response = new MockClientHttpResponse(new byte[0], 200);
+
+        new OutgoingHttpLoggingInterceptor(properties)
+                .intercept(request, new byte[0], (ignoredRequest, ignoredBody) -> response);
+
+        assertThat(appender.list.get(0).getFormattedMessage())
+                .contains("client%5Fsecret=***")
+                .contains("%C3=value")
+                .doesNotContain("client%5Fsecret=visible");
     }
 
     @Test
@@ -186,6 +246,81 @@ class OutgoingHttpLoggingInterceptorTest {
                 .contains("HTTP client failure")
                 .contains("exception=IOException")
                 .doesNotContain("secret response body");
+    }
+
+    @Test
+    void skipsExcludedPathsWithoutLogging() throws IOException {
+        LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
+        properties.setLevel(HttpLoggingLevel.FULL);
+        properties.setExcludePaths(List.of(" /health ", ""));
+        OutgoingHttpLoggingInterceptor interceptor = new OutgoingHttpLoggingInterceptor(properties);
+        MockClientHttpRequest request =
+                new MockClientHttpRequest(
+                        HttpMethod.GET, URI.create("https://idp.example/health/live"));
+
+        MockClientHttpResponse response = new MockClientHttpResponse(new byte[0], 200);
+        interceptor.intercept(request, new byte[0], (ignoredRequest, ignoredBody) -> response);
+
+        assertThat(appender.list).isEmpty();
+    }
+
+    @Test
+    void omitsNonTextAndUnknownLengthResponseBodies() throws IOException {
+        LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
+        properties.setLevel(HttpLoggingLevel.FULL);
+        OutgoingHttpLoggingInterceptor interceptor = new OutgoingHttpLoggingInterceptor(properties);
+        MockClientHttpRequest request =
+                new MockClientHttpRequest(HttpMethod.GET, URI.create("https://idp.example/"));
+        MockClientHttpResponse binaryResponse =
+                new MockClientHttpResponse("binary".getBytes(StandardCharsets.UTF_8), 200);
+        binaryResponse.getHeaders().setContentType(MediaType.APPLICATION_OCTET_STREAM);
+
+        interceptor.intercept(
+                request, new byte[0], (ignoredRequest, ignoredBody) -> binaryResponse);
+
+        assertThat(appender.list.get(1).getFormattedMessage()).contains("body=[omitted]");
+        assertThat(binaryResponse.getBody().readAllBytes())
+                .isEqualTo("binary".getBytes(StandardCharsets.UTF_8));
+
+        appender.list.clear();
+        MockClientHttpResponse unknownLengthResponse =
+                new MockClientHttpResponse(
+                        "{\"name\":\"value\"}".getBytes(StandardCharsets.UTF_8), 200);
+        unknownLengthResponse.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+
+        interceptor.intercept(
+                request, new byte[0], (ignoredRequest, ignoredBody) -> unknownLengthResponse);
+
+        assertThat(appender.list.get(1).getFormattedMessage())
+                .contains("body=[omitted: unknown-size]");
+        assertThat(unknownLengthResponse.getBody().readAllBytes())
+                .isEqualTo("{\"name\":\"value\"}".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void omitsFullBodiesWhenBodyLimitIsZero() throws IOException {
+        LoggingProperties.HttpClient properties = new LoggingProperties.HttpClient();
+        properties.setLevel(HttpLoggingLevel.FULL);
+        OutgoingHttpLoggingInterceptor interceptor =
+                new OutgoingHttpLoggingInterceptor(
+                        properties, new LoggingProperties.Obfuscate(), 0);
+        MockClientHttpRequest request =
+                new MockClientHttpRequest(HttpMethod.POST, URI.create("https://idp.example/token"));
+        MockClientHttpResponse response =
+                new MockClientHttpResponse("{}".getBytes(StandardCharsets.UTF_8), 200);
+        response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
+        response.getHeaders().setContentLength(2);
+
+        var returned =
+                interceptor.intercept(
+                        request,
+                        "payload".getBytes(StandardCharsets.UTF_8),
+                        (ignoredRequest, ignoredBody) -> response);
+
+        assertThat(appender.list.get(0).getFormattedMessage()).contains("body=[omitted]");
+        assertThat(appender.list.get(1).getFormattedMessage()).contains("body=[omitted]");
+        assertThat(returned.getBody().readAllBytes())
+                .isEqualTo("{}".getBytes(StandardCharsets.UTF_8));
     }
 
     @Test

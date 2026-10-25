@@ -198,6 +198,43 @@ test("restores a backed-up installation and preserves the recovery marker for st
   await assert.rejects(readFile(backupPath));
 });
 
+test("relaunches the restored installation after rollback", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "kitezh-rollback-launch-"));
+  const targetPath = path.join(root, "current");
+  const backupPath = path.join(root, "backup");
+  const recoveryPath = path.join(root, "recovery.json");
+  await mkdir(targetPath);
+  await mkdir(backupPath);
+  await writeFile(path.join(targetPath, "new-version.txt"), "new");
+  await writeFile(path.join(backupPath, "previous-version.txt"), "previous");
+  await writeFile(recoveryPath, "pending");
+
+  try {
+    await restoreInstallation(
+      {
+        backupPath,
+        targetPath,
+        targetType: "directory",
+        executablePath: process.execPath,
+        version: "0.2.0",
+        previousVersion: "0.1.0",
+        startedAt: Date.now(),
+      },
+      recoveryPath,
+      true,
+    );
+
+    assert.equal(
+      await readFile(path.join(targetPath, "previous-version.txt"), "utf8"),
+      "previous",
+    );
+    assert.equal(await readFile(recoveryPath, "utf8"), "pending");
+    await assert.rejects(readFile(backupPath));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("restores an installation when the failed target is missing", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "kitezh-missing-target-"));
   const targetPath = path.join(root, "current");

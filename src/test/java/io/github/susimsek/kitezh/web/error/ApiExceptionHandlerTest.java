@@ -10,7 +10,10 @@ import ch.qos.logback.core.read.ListAppender;
 import io.github.susimsek.kitezh.dto.error.ApiViolationDTO;
 import io.github.susimsek.kitezh.service.error.ApiErrorCode;
 import io.github.susimsek.kitezh.service.error.ApiException;
+import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.ElementKind;
+import jakarta.validation.Path;
 import jakarta.validation.Validation;
 import jakarta.validation.constraints.NotBlank;
 import java.lang.reflect.Method;
@@ -36,6 +39,7 @@ import org.springframework.validation.method.MethodValidationResult;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.context.request.ServletWebRequest;
+import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 class ApiExceptionHandlerTest {
@@ -91,6 +95,53 @@ class ApiExceptionHandlerTest {
         assertThat(problem.getProperties())
                 .containsEntry("errorCode", "forbidden")
                 .doesNotContainKey("violations");
+    }
+
+    @Test
+    void supportsMissingServletRequestAndUnconfiguredMessageSource() {
+        ApiExceptionHandler handler = new ApiExceptionHandler();
+        var problem =
+                handler.handleApiException(
+                        ApiException.forbidden(ApiErrorCode.FORBIDDEN, "Access denied"), null);
+
+        assertThat(problem.getDetail()).isEqualTo("You are not allowed to perform this operation.");
+        assertThat(problem.getInstance()).isNull();
+
+        WebRequest nonServletRequest = mock(WebRequest.class);
+        var response =
+                handler.handleUnhandled(
+                        new IllegalStateException("internal details"), nonServletRequest);
+        var unhandled = (org.springframework.http.ProblemDetail) response.getBody();
+        assertThat(unhandled).isNotNull();
+        assertThat(unhandled.getInstance()).isNull();
+    }
+
+    @Test
+    void usesDefaultResolvableMessagesWhenNoMessageSourceIsConfigured()
+            throws NoSuchMethodException {
+        BeanPropertyBindingResult bindingResult =
+                new BeanPropertyBindingResult(new Object(), "clientRequest");
+        bindingResult.addError(
+                new FieldError("clientRequest", "clientId", "Client ID is required"));
+        Method method = ApiExceptionHandlerTest.class.getDeclaredMethod("request", String.class);
+        MethodArgumentNotValidException exception =
+                new MethodArgumentNotValidException(new MethodParameter(method, 0), bindingResult);
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/admin/clients");
+
+        var response =
+                new ApiExceptionHandler()
+                        .handleMethodArgumentNotValid(
+                                exception,
+                                HttpHeaders.EMPTY,
+                                HttpStatus.BAD_REQUEST,
+                                new ServletWebRequest(request));
+        var problem = (org.springframework.http.ProblemDetail) response.getBody();
+
+        assertThat(problem).isNotNull();
+        assertThat(problem.getProperties())
+                .containsEntry(
+                        "violations",
+                        List.of(new ApiViolationDTO("clientId", "Client ID is required")));
     }
 
     @Test
@@ -235,6 +286,46 @@ class ApiExceptionHandlerTest {
                 .containsEntry(
                         "violations",
                         java.util.List.of(new ApiViolationDTO("clientId", "must not be blank")));
+    }
+
+    @Test
+    void normalizesIndexedNestedAndMissingViolationFields() {
+        assertThat(new ApiViolationDTO("items[0].name", "invalid").field()).isEqualTo("items");
+        assertThat(new ApiViolationDTO("profile.name", "invalid").field()).isEqualTo("profile");
+        assertThat(new ApiViolationDTO("items[0]", "invalid").field()).isEqualTo("items");
+        assertThat(new ApiViolationDTO(".name", "invalid").field()).isEqualTo("request");
+        assertThat(new ApiViolationDTO("", "invalid").field()).isEqualTo("request");
+        assertThat(new ApiViolationDTO(null, "invalid").field()).isEqualTo("request");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void ignoresNonPropertyConstraintPathNodes() {
+        Path path = mock(Path.class);
+        Path.Node beanNode = mock(Path.Node.class);
+        when(path.iterator()).thenReturn(List.of(beanNode).iterator());
+        when(beanNode.getName()).thenReturn("target");
+        when(beanNode.getKind()).thenReturn(ElementKind.BEAN);
+        ConstraintViolation<Object> violation = mock(ConstraintViolation.class);
+        when(violation.getPropertyPath()).thenReturn(path);
+        when(violation.getMessage()).thenReturn("invalid");
+
+        assertThat(ApiViolationDTO.from(violation).field()).isEqualTo("request");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void extractsPropertyConstraintPathNodes() {
+        Path path = mock(Path.class);
+        Path.Node propertyNode = mock(Path.Node.class);
+        when(path.iterator()).thenReturn(List.of(propertyNode).iterator());
+        when(propertyNode.getName()).thenReturn("email");
+        when(propertyNode.getKind()).thenReturn(ElementKind.PROPERTY);
+        ConstraintViolation<Object> violation = mock(ConstraintViolation.class);
+        when(violation.getPropertyPath()).thenReturn(path);
+        when(violation.getMessage()).thenReturn("invalid");
+
+        assertThat(ApiViolationDTO.from(violation).field()).isEqualTo("email");
     }
 
     @Test

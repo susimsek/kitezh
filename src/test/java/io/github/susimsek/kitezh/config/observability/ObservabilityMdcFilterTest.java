@@ -236,12 +236,11 @@ class ObservabilityMdcFilterTest {
     }
 
     @Test
-    void logsLongRequestDetailsWithMaskedHeadersAndCookies() throws Exception {
+    void logsLongRequestDetailsWithMaskedHeaders() throws Exception {
         LoggingProperties.Server access = new LoggingProperties.Server();
         access.setLevel(HttpLoggingLevel.HEADERS);
         LoggingProperties.Obfuscate obfuscate = new LoggingProperties.Obfuscate();
-        obfuscate.setHeaders(List.of("X-Secret"));
-        obfuscate.setCookies(List.of("session"));
+        obfuscate.setHeaders(List.of("X-Secret", "Cookie"));
         final ObservabilityMdcFilter longFilter = new ObservabilityMdcFilter(access, obfuscate);
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/long");
         request.addHeader("X-Secret", "hidden");
@@ -250,6 +249,14 @@ class ObservabilityMdcFilterTest {
 
         longFilter.doFilterInternal(request, new MockHttpServletResponse(), (req, res) -> {});
 
+        assertThat(accessAppender.list)
+                .singleElement()
+                .satisfies(
+                        event ->
+                                assertThat(event.getFormattedMessage())
+                                        .contains("X-Secret=***")
+                                        .contains("Cookie=***")
+                                        .doesNotContain("hidden-cookie", "dark"));
         assertThat(MDC.getCopyOfContextMap()).isNullOrEmpty();
     }
 
@@ -377,7 +384,6 @@ class ObservabilityMdcFilterTest {
     void ignoresBlankRequestIdentifiersAndAnonymousAuthentication() throws Exception {
         LoggingProperties.Obfuscate obfuscate = new LoggingProperties.Obfuscate();
         obfuscate.setHeaders(java.util.Arrays.asList(null, " ", "X-Secret"));
-        obfuscate.setCookies(java.util.Arrays.asList(null, " ", "SESSION"));
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/anonymous");
         request.setParameter("client_id", " ");
         request.setParameter("clientId", "");

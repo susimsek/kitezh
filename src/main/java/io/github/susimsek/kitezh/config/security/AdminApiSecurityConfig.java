@@ -10,6 +10,9 @@ import io.github.susimsek.kitezh.security.AuthoritiesConstants;
 import io.github.susimsek.kitezh.service.AuthorizationRevocationPolicyService;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -28,6 +31,8 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 public class AdminApiSecurityConfig {
 
     private static final String USERS_API_PATH = "/api/admin/users/**";
+    private static final String DEFAULT_MCP_RESOURCE_AUDIENCE =
+            "https://kitezh-mcp.onrender.com/mcp";
 
     @Bean
     @Order(1)
@@ -35,12 +40,15 @@ public class AdminApiSecurityConfig {
             HttpSecurity http,
             JwtDecoder adminApiJwtDecoder,
             ApplicationProperties applicationProperties,
-            LoggingProperties loggingProperties) {
+            LoggingProperties loggingProperties,
+            @Value("${app.mcp.resource-audience:https://kitezh-mcp.onrender.com/mcp}")
+                    String mcpResourceAudience) {
         return adminApiSecurityFilterChain(
                 http,
                 adminApiJwtDecoder,
                 new DpopNonceService(applicationProperties.dpop()),
-                new ObservabilityMdcFilter(loggingProperties));
+                new ObservabilityMdcFilter(loggingProperties),
+                mcpResourceAudience);
     }
 
     SecurityFilterChain adminApiSecurityFilterChain(
@@ -49,17 +57,21 @@ public class AdminApiSecurityConfig {
                 http,
                 adminApiJwtDecoder,
                 new DpopNonceService(new ApplicationProperties().dpop()),
-                new ObservabilityMdcFilter());
+                new ObservabilityMdcFilter(),
+                DEFAULT_MCP_RESOURCE_AUDIENCE);
     }
 
     private SecurityFilterChain adminApiSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder adminApiJwtDecoder,
             DpopNonceService nonceService,
-            ObservabilityMdcFilter observabilityMdcFilter) {
+            ObservabilityMdcFilter observabilityMdcFilter,
+            String mcpResourceAudience) {
         ConsoleApiSecurity.stateless(http);
         http.securityMatcher("/api/admin/**")
                 .addFilterBefore(observabilityMdcFilter, AuthorizationFilter.class)
+                .addFilterBefore(
+                        new McpAdminApiAccessFilter(mcpResourceAudience), AuthorizationFilter.class)
                 .authorizeHttpRequests(
                         authorize ->
                                 authorize
@@ -80,7 +92,31 @@ public class AdminApiSecurityConfig {
                                         .requestMatchers("/api/admin/settings/**")
                                         .hasAuthority(AuthoritiesConstants.ADMIN)
                                         .requestMatchers("/api/admin/whoami")
-                                        .hasAuthority("SCOPE_admin-api")
+                                        .access(
+                                                (authentication, context) -> {
+                                                    var currentAuthentication =
+                                                            authentication.get();
+                                                    boolean adminApiScope =
+                                                            currentAuthentication
+                                                                    .getAuthorities()
+                                                                    .stream()
+                                                                    .anyMatch(
+                                                                            authority ->
+                                                                                    "SCOPE_admin-api"
+                                                                                            .equals(
+                                                                                                    authority
+                                                                                                            .getAuthority()));
+                                                    boolean mcpPurposeToken =
+                                                            currentAuthentication.getPrincipal()
+                                                                            instanceof Jwt jwt
+                                                                    && McpAdminApiAccessFilter
+                                                                            .isMcpPurposeToken(
+                                                                                    jwt,
+                                                                                    mcpResourceAudience);
+                                                    return new org.springframework.security
+                                                            .authorization.AuthorizationDecision(
+                                                            adminApiScope || mcpPurposeToken);
+                                                })
                                         .requestMatchers("/api/admin/notifications/**")
                                         .hasAuthority(AuthoritiesConstants.ADMIN)
                                         .requestMatchers(
@@ -107,6 +143,24 @@ public class AdminApiSecurityConfig {
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
                                                 AuthoritiesConstants.EVENT_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.GET,
+                                                "/api/admin/authorization/resources")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.CLIENT_QUERY,
+                                                AuthoritiesConstants.CLIENT_VIEWER,
+                                                AuthoritiesConstants.CLIENT_MANAGER)
+                                        .requestMatchers(
+                                                HttpMethod.GET, "/api/admin/authorization/**")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.CLIENT_VIEWER,
+                                                AuthoritiesConstants.CLIENT_MANAGER)
+                                        .requestMatchers("/api/admin/authorization/**")
+                                        .hasAnyAuthority(
+                                                AuthoritiesConstants.ADMIN,
+                                                AuthoritiesConstants.CLIENT_MANAGER)
                                         .requestMatchers(HttpMethod.GET, "/api/admin/client-scopes")
                                         .hasAnyAuthority(
                                                 AuthoritiesConstants.ADMIN,
@@ -342,13 +396,31 @@ public class AdminApiSecurityConfig {
             JWKSource<SecurityContext> jwkSource,
             ApplicationProperties applicationProperties,
             AuthorizationRepository authorizationRepository,
-            AuthorizationRevocationPolicyService revocationPolicyService) {
+            AuthorizationRevocationPolicyService revocationPolicyService,
+            @Value("${app.mcp.resource-audience:https://kitezh-mcp.onrender.com/mcp}")
+                    String mcpResourceAudience) {
         return ConsoleJwtDecoderFactory.create(
                 jwkSource,
                 applicationProperties.authorizationServer().issuer(),
-                ConsoleClients.ADMIN_CLIENTS,
+                Stream.concat(
+                                ConsoleClients.ADMIN_CLIENTS.stream(),
+                                Stream.of("admin-api", mcpResourceAudience))
+                        .collect(Collectors.toUnmodifiableSet()),
                 authorizationRepository,
                 revocationPolicyService);
+    }
+
+    JwtDecoder adminApiJwtDecoder(
+            JWKSource<SecurityContext> jwkSource,
+            ApplicationProperties applicationProperties,
+            AuthorizationRepository authorizationRepository,
+            AuthorizationRevocationPolicyService revocationPolicyService) {
+        return adminApiJwtDecoder(
+                jwkSource,
+                applicationProperties,
+                authorizationRepository,
+                revocationPolicyService,
+                DEFAULT_MCP_RESOURCE_AUDIENCE);
     }
 
     private static JwtAuthenticationConverter jwtAuthenticationConverter() {

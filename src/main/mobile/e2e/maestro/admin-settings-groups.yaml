@@ -1,0 +1,165 @@
+appId: io.github.susimsek.kitezh.mobile
+---
+- stopApp
+- launchApp:
+    clearState: true
+- openLink: "kitezh://admin"
+- tapOn:
+    text: "Open"
+    optional: true
+- tapOn:
+    point: "68%,54%"
+    optional: true
+- extendedWaitUntil:
+    visible: "Sign in to Administration|Administration Console"
+    timeout: 180000
+# Clear any SecureStore Admin session left by an earlier local run. iOS keychain
+# records survive Maestro's clearState option and the fixture may have restarted.
+- tapOn:
+    text: "Sign out"
+    optional: true
+- tapOn:
+    text: "^Continue$"
+    optional: true
+- extendedWaitUntil:
+    visible: "Sign in to Administration"
+    timeout: 30000
+- tapOn: "Sign in"
+# Android may show Chrome's first-run account prompt on a clean emulator.
+- tapOn:
+    text: "Use without an account"
+    optional: true
+# iOS may ask once to allow the app to use the local fixture domain for sign-in.
+- tapOn:
+    text: "^Continue$"
+    optional: true
+- tapOn:
+    text: "Stay signed out"
+    optional: true
+- tapOn:
+    text: "Continue with fixture account"
+    optional: true
+- extendedWaitUntil:
+    visible: "Administration Console"
+    timeout: 180000
+- tapOn:
+    id: admin-tab-server-info
+- extendedWaitUntil:
+    visible:
+      id: admin-server-info-content
+    timeout: 60000
+- assertVisible: "PT30M"
+- swipe:
+    start: "85%,92%"
+    end: "60%,92%"
+- swipe:
+    start: "85%,92%"
+    end: "60%,92%"
+- swipe:
+    start: "85%,92%"
+    end: "60%,92%"
+- tapOn:
+    id: admin-tab-groups
+- extendedWaitUntil:
+    visible: "Fixture operators"
+    timeout: 60000
+- swipe:
+    start: "50%,65%"
+    end: "50%,30%"
+- tapOn:
+    id: admin-group-manage-members-3
+- assertVisible: "Group members"
+- assertVisible: "fixture-member"
+- assertVisible: "fixture-candidate"
+- tapOn: "Add to group"
+- assertVisible: "User added to group."
+- assertVisible: "fixture-candidate"
+- tapOn: "‹ Back"
+- swipe:
+    start: "90%,92%"
+    end: "35%,92%"
+- swipe:
+    start: "90%,92%"
+    end: "35%,92%"
+- swipe:
+    start: "90%,92%"
+    end: "35%,92%"
+- swipe:
+    start: "90%,92%"
+    end: "35%,92%"
+- tapOn:
+    id: admin-tab-settings
+- assertVisible: "Audit event settings"
+- tapOn: "Include event details"
+- tapOn:
+    id: admin-event-retention-days
+- eraseText: 2
+- inputText: "90"
+- tapOn: "Audit event settings"
+- swipe:
+    start: "50%,65%"
+    end: "50%,35%"
+- tapOn:
+    id: admin-event-settings-save
+- assertVisible: "Resource updated."
+- tapOn:
+    id: admin-tab-events
+- tapOn:
+    id: admin-tab-settings
+- scrollUntilVisible:
+    element:
+      id: admin-event-retention-days
+    direction: DOWN
+- assertVisible: "90"
+- scrollUntilVisible:
+    element:
+      text: "Login policy"
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      text: "Session timeout"
+    direction: DOWN
+- assertVisible: "Session timeout"
+- scrollUntilVisible:
+    element:
+      text: "CIBA policy"
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      text: "Request lifetime (seconds)"
+    direction: DOWN
+- assertVisible: "Request lifetime (seconds)"
+- scrollUntilVisible:
+    element:
+      text: "Offline access policy"
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      text: "Idle timeout"
+    direction: DOWN
+- assertVisible: "Idle timeout"
+- scrollUntilVisible:
+    element:
+      text: "Email delivery settings"
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      text: "SMTP password configured"
+    direction: DOWN
+- assertVisible: "SMTP password configured"
+- scrollUntilVisible:
+    element:
+      id: admin-email-save
+    direction: DOWN
+- assertVisible:
+    id: admin-email-save
+- scrollUntilVisible:
+    element:
+      text: "Language settings"
+    direction: DOWN
+- scrollUntilVisible:
+    element:
+      id: admin-localization-save
+    direction: DOWN
+- assertVisible:
+    id: admin-localization-save

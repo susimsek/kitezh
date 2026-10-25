@@ -223,6 +223,34 @@ it("clears failed user and group suggestions", async () => {
   );
 });
 
+it("hides group suggestions when the search is denied", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockImplementation(async (_token, config) => {
+    if (config.url?.includes("available-groups")) return { status: 403, data: {} } as never;
+    if (config.url?.includes("/roles/9?")) return { status: 200, data: detail } as never;
+    return {
+      status: 200,
+      data: { content: [role], totalPages: 1, totalElements: 1 },
+    } as never;
+  });
+
+  render(<ClientRoles clientId="orders-client" dictionary={en} />);
+  fireEvent.click(await screen.findByRole("button", { name: role.name }));
+  fireEvent.change(
+    await screen.findByPlaceholderText(en.admin.clients.roles.searchGroupsPlaceholder),
+    { target: { value: "ops" } },
+  );
+
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({ url: expect.stringContaining("available-groups?q=ops") }),
+    ),
+  );
+  expect(screen.queryByRole("button", { name: "Operations" })).not.toBeInTheDocument();
+  expect(mockAddError).not.toHaveBeenCalled();
+});
+
 it("skips role requests when the access token is unavailable", async () => {
   const request = jest.mocked(adminRequest);
   request.mockResolvedValue({
@@ -469,6 +497,48 @@ it("shows a spinner while saving a role", async () => {
   );
   completeSave({ status: 201, data: role });
   await waitFor(() => expect(mockAddAlert).toHaveBeenCalledWith(en.admin.clients.roles.saved));
+});
+
+it("clears failed client and realm composite suggestions", async () => {
+  const request = jest.mocked(adminRequest);
+  request.mockImplementation(async (_token, config) => {
+    if (config.url?.includes("available-composites")) {
+      return { status: 500, data: {} } as never;
+    }
+    if (config.url?.includes("available-realm-composites")) {
+      throw new Error("network failure");
+    }
+    if (config.url?.includes("/roles/9?")) return { status: 200, data: detail } as never;
+    return {
+      status: 200,
+      data: { content: [role], totalPages: 1, totalElements: 1 },
+    } as never;
+  });
+
+  render(<ClientRoles clientId="orders-client" dictionary={en} />);
+  fireEvent.click(await screen.findByRole("button", { name: role.name }));
+
+  fireEvent.change(await screen.findByLabelText(en.admin.clients.roles.assignComposite), {
+    target: { value: "audit" },
+  });
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({ url: expect.stringContaining("available-composites") }),
+    ),
+  );
+  expect(screen.queryByRole("button", { name: "orders.audit" })).not.toBeInTheDocument();
+
+  fireEvent.change(await screen.findByLabelText(en.admin.clients.roles.assignRealmComposite), {
+    target: { value: "auditor" },
+  });
+  await waitFor(() =>
+    expect(request).toHaveBeenCalledWith(
+      "token",
+      expect.objectContaining({ url: expect.stringContaining("available-realm-composites") }),
+    ),
+  );
+  expect(screen.queryByRole("button", { name: "ROLE_AUDITOR" })).not.toBeInTheDocument();
 });
 
 it("searches and assigns client and realm composite roles", async () => {

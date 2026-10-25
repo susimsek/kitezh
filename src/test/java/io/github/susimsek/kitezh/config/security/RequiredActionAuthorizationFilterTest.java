@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -102,6 +103,55 @@ class RequiredActionAuthorizationFilterTest {
         assertThat(session.isInvalid()).isTrue();
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         assertThat(request.getSession(false)).isNull();
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void passesThroughWhenAuthenticationIsMissingOrNotAuthenticated() throws Exception {
+        MockHttpServletRequest missingAuthenticationRequest =
+                new MockHttpServletRequest("GET", "/oauth2/authorize");
+        MockHttpServletResponse missingAuthenticationResponse = new MockHttpServletResponse();
+        filter.doFilter(missingAuthenticationRequest, missingAuthenticationResponse, filterChain);
+
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken("alice", "password"));
+        MockHttpServletRequest unauthenticatedRequest =
+                new MockHttpServletRequest("GET", "/oauth2/authorize");
+        MockHttpServletResponse unauthenticatedResponse = new MockHttpServletResponse();
+        filter.doFilter(unauthenticatedRequest, unauthenticatedResponse, filterChain);
+
+        verify(filterChain).doFilter(missingAuthenticationRequest, missingAuthenticationResponse);
+        verify(filterChain).doFilter(unauthenticatedRequest, unauthenticatedResponse);
+
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new AnonymousAuthenticationToken(
+                                "key",
+                                "anonymousUser",
+                                List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS"))));
+        MockHttpServletRequest anonymousRequest =
+                new MockHttpServletRequest("GET", "/oauth2/authorize");
+        MockHttpServletResponse anonymousResponse = new MockHttpServletResponse();
+        filter.doFilter(anonymousRequest, anonymousResponse, filterChain);
+        verify(filterChain).doFilter(anonymousRequest, anonymousResponse);
+    }
+
+    @Test
+    void clearsDeletedUserAuthenticationWhenNoSessionExists() throws Exception {
+        SecurityContextHolder.getContext()
+                .setAuthentication(
+                        new UsernamePasswordAuthenticationToken(
+                                "deleted-user",
+                                "password",
+                                List.of(new SimpleGrantedAuthority("ROLE_USER"))));
+        when(requiredActionService.pendingIfUserExists("deleted-user"))
+                .thenReturn(Optional.empty());
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/oauth2/authorize");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(filterChain).doFilter(request, response);
     }
 }

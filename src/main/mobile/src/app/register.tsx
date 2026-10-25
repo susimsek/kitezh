@@ -1,8 +1,8 @@
 import { router } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -11,11 +11,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getCaptchaSettings, registerAccount } from "@/api/public-api";
+import {
+  getCaptchaSettings,
+  PublicApiError,
+  registerAccount,
+  type CaptchaSettings,
+} from "@/api/public-api";
+import { publicErrorMessage } from "@/api/public-error-message";
 import { AppIcon } from "@/components/AppIcon";
 import { BrandMark } from "@/components/BrandMark";
 import { MobileFormScrollView } from "@/components/MobileFormScrollView";
-import { authorizationServerIssuer } from "@/config";
+import { createNativeCaptchaToken } from "@/auth/native-captcha";
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
@@ -31,43 +37,104 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [captchaEnabled, setCaptchaEnabled] = useState<boolean | null>(null);
+  const [captchaSettings, setCaptchaSettings] =
+    useState<CaptchaSettings | null>(null);
+  const [captchaSettingsUnavailable, setCaptchaSettingsUnavailable] =
+    useState(false);
   const [pending, setPending] = useState(false);
-  const [browserPending, setBrowserPending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [browserError, setBrowserError] = useState(false);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
+  const nativeCaptchaSiteKey =
+    Platform.OS === "ios"
+      ? captchaSettings?.iosSiteKey
+      : captchaSettings?.androidSiteKey;
+  const nativeCaptchaUnavailable =
+    captchaSettings?.nativeRequired === true &&
+    (captchaSettings.nativeEnabled !== true ||
+      captchaSettings.provider !== "enterprise" ||
+      !nativeCaptchaSiteKey);
 
   useEffect(() => {
     void getCaptchaSettings()
-      .then((settings) => setCaptchaEnabled(settings.enabled))
-      .catch(() => setCaptchaEnabled(true));
+      .then((settings) => {
+        setCaptchaSettings(settings);
+        setCaptchaSettingsUnavailable(false);
+      })
+      .catch(() => {
+        setCaptchaSettings(null);
+        setCaptchaSettingsUnavailable(true);
+      });
   }, []);
 
   const submit = async () => {
-    if (pending || captchaEnabled !== false) return;
     if (
-      !username.trim() ||
-      !firstName.trim() ||
-      !lastName.trim() ||
-      !email.trim()
+      pending ||
+      !captchaSettings ||
+      captchaSettingsUnavailable ||
+      nativeCaptchaUnavailable
     ) {
-      setError(dictionary.registrationError);
       return;
     }
-    if (
-      !isValidEmail(email.trim()) ||
-      password.length < 12 ||
-      password !== confirmPassword
-    ) {
-      setError(dictionary.registrationError);
+    const invalidField = [
+      {
+        name: "username",
+        message: dictionary.registrationError,
+        valid: Boolean(username.trim()),
+      },
+      {
+        name: "firstName",
+        message: dictionary.registrationError,
+        valid: Boolean(firstName.trim()),
+      },
+      {
+        name: "lastName",
+        message: dictionary.registrationError,
+        valid: Boolean(lastName.trim()),
+      },
+      {
+        name: "email",
+        message: dictionary.invalidEmail,
+        valid: isValidEmail(email.trim()),
+      },
+      {
+        name: "password",
+        message: dictionary.passwordMinLength,
+        valid: password.length >= 12,
+      },
+      {
+        name: "confirmPassword",
+        message: dictionary.passwordMismatch,
+        valid: password === confirmPassword && Boolean(confirmPassword),
+      },
+    ].find((field) => !field.valid);
+    if (invalidField) {
+      setError(null);
+      setFieldErrors({ [invalidField.name]: invalidField.message });
+      inputRefs.current[
+        [
+          "username",
+          "firstName",
+          "lastName",
+          "email",
+          "password",
+          "confirmPassword",
+        ].indexOf(invalidField.name)
+      ]?.focus();
       return;
     }
     setPending(true);
     setError(null);
     setFieldErrors({});
     try {
+      const captchaToken =
+        captchaSettings.nativeRequired && nativeCaptchaSiteKey
+          ? await createNativeCaptchaToken(
+              nativeCaptchaSiteKey,
+              captchaSettings.action,
+            )
+          : null;
       await registerAccount({
         username: username.trim(),
         firstName: firstName.trim(),
@@ -75,29 +142,22 @@ export default function RegisterScreen() {
         email: email.trim(),
         password,
         confirmPassword,
+        captchaToken,
+        mobilePlatform: Platform.OS === "ios" ? "IOS" : "ANDROID",
         locale: resolvedLocale,
       });
       setSuccess(true);
     } catch (cause) {
       setFieldErrors(problemFieldErrors(cause));
-      setError(dictionary.registrationError);
+      setError(
+        publicErrorMessage(
+          cause instanceof PublicApiError ? cause.kind : undefined,
+          dictionary,
+          "registrationError",
+        ),
+      );
     } finally {
       setPending(false);
-    }
-  };
-
-  const openBrowserRegistration = async () => {
-    if (browserPending) return;
-    setBrowserPending(true);
-    setBrowserError(false);
-    try {
-      await WebBrowser.openBrowserAsync(
-        `${authorizationServerIssuer.replace(/\/$/, "")}/register`,
-      );
-    } catch {
-      setBrowserError(true);
-    } finally {
-      setBrowserPending(false);
     }
   };
 
@@ -144,7 +204,7 @@ export default function RegisterScreen() {
               </View>
             );
           } else {
-            if (captchaEnabled === null) {
+            if (captchaSettings === null && !captchaSettingsUnavailable) {
               return (
                 <ActivityIndicator
                   color={palette.primary}
@@ -152,48 +212,32 @@ export default function RegisterScreen() {
                   style={styles.loading}
                 />
               );
+            } else if (captchaSettings === null) {
+              return (
+                <View style={[styles.message, { borderColor: palette.danger }]}>
+                  <Text style={{ color: palette.danger }}>
+                    {dictionary.registrationCaptchaSettingsUnavailable}
+                  </Text>
+                </View>
+              );
             } else {
-              if (captchaEnabled) {
+              if (nativeCaptchaUnavailable) {
                 return (
                   <View
-                    style={[styles.message, { borderColor: palette.border }]}
+                    style={[styles.message, { borderColor: palette.danger }]}
                   >
                     <Text style={{ color: palette.text }}>
                       {dictionary.registrationCaptcha}
                     </Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ disabled: browserPending }}
-                      disabled={browserPending}
-                      onPress={() => void openBrowserRegistration()}
-                      style={[
-                        styles.link,
-                        { opacity: browserPending ? 0.65 : 1 },
-                      ]}
-                    >
-                      {browserPending ? (
-                        <ActivityIndicator
-                          color={palette.primary}
-                          size="small"
-                        />
-                      ) : null}
-                      <Text
-                        style={{ color: palette.primary, fontWeight: "700" }}
-                      >
-                        {dictionary.continueInBrowser}
-                      </Text>
-                    </Pressable>
-                    {browserError ? (
-                      <Text style={[styles.error, { color: palette.danger }]}>
-                        {dictionary.browserError}
-                      </Text>
-                    ) : null}
                   </View>
                 );
               } else {
                 return (
                   <View style={styles.form}>
                     <Field
+                      inputRef={(node) => {
+                        inputRefs.current[0] = node;
+                      }}
                       label={dictionary.username}
                       value={username}
                       onChangeText={(value) => {
@@ -201,11 +245,15 @@ export default function RegisterScreen() {
                         setFieldErrors((current) =>
                           omitFieldError(current, "username"),
                         );
+                        setError(null);
                       }}
                       error={fieldErrors.username}
                       palette={palette}
                     />
                     <Field
+                      inputRef={(node) => {
+                        inputRefs.current[1] = node;
+                      }}
                       label={dictionary.firstName}
                       value={firstName}
                       onChangeText={(value) => {
@@ -213,11 +261,15 @@ export default function RegisterScreen() {
                         setFieldErrors((current) =>
                           omitFieldError(current, "firstName"),
                         );
+                        setError(null);
                       }}
                       error={fieldErrors.firstName}
                       palette={palette}
                     />
                     <Field
+                      inputRef={(node) => {
+                        inputRefs.current[2] = node;
+                      }}
                       label={dictionary.lastName}
                       value={lastName}
                       onChangeText={(value) => {
@@ -225,11 +277,15 @@ export default function RegisterScreen() {
                         setFieldErrors((current) =>
                           omitFieldError(current, "lastName"),
                         );
+                        setError(null);
                       }}
                       error={fieldErrors.lastName}
                       palette={palette}
                     />
                     <Field
+                      inputRef={(node) => {
+                        inputRefs.current[3] = node;
+                      }}
                       label={dictionary.email}
                       value={email}
                       onChangeText={(value) => {
@@ -237,12 +293,16 @@ export default function RegisterScreen() {
                         setFieldErrors((current) =>
                           omitFieldError(current, "email"),
                         );
+                        setError(null);
                       }}
                       error={fieldErrors.email}
                       keyboardType="email-address"
                       palette={palette}
                     />
                     <Field
+                      inputRef={(node) => {
+                        inputRefs.current[4] = node;
+                      }}
                       label={dictionary.newPassword}
                       value={password}
                       onChangeText={(value) => {
@@ -250,12 +310,16 @@ export default function RegisterScreen() {
                         setFieldErrors((current) =>
                           omitFieldError(current, "password"),
                         );
+                        setError(null);
                       }}
                       error={fieldErrors.password}
                       secureTextEntry
                       palette={palette}
                     />
                     <Field
+                      inputRef={(node) => {
+                        inputRefs.current[5] = node;
+                      }}
                       label={dictionary.confirmPassword}
                       value={confirmPassword}
                       onChangeText={(value) => {
@@ -263,19 +327,23 @@ export default function RegisterScreen() {
                         setFieldErrors((current) =>
                           omitFieldError(current, "confirmPassword"),
                         );
+                        setError(null);
                       }}
                       error={fieldErrors.confirmPassword}
                       secureTextEntry
                       palette={palette}
                     />
                     {error ? (
-                      <Text style={[styles.error, { color: palette.danger }]}>
+                      <Text
+                        accessibilityRole="alert"
+                        style={[styles.error, { color: palette.danger }]}
+                      >
                         {error}
                       </Text>
                     ) : null}
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityState={{ disabled: pending }}
+                      accessibilityState={{ busy: pending, disabled: pending }}
                       disabled={pending}
                       onPress={() => void submit()}
                       style={[
@@ -287,7 +355,10 @@ export default function RegisterScreen() {
                       ]}
                     >
                       {pending ? (
-                        <ActivityIndicator color={palette.onPrimary} />
+                        <ActivityIndicator
+                          accessibilityLabel={dictionary.loading}
+                          color={palette.onPrimary}
+                        />
                       ) : null}
                       <Text
                         style={{ color: palette.onPrimary, fontWeight: "700" }}
@@ -314,6 +385,7 @@ function Field({
   palette,
   secureTextEntry = false,
   keyboardType = "default",
+  inputRef,
 }: {
   readonly label: string;
   readonly value: string;
@@ -322,6 +394,7 @@ function Field({
   readonly palette: ReturnType<typeof useTheme>["palette"];
   readonly secureTextEntry?: boolean;
   readonly keyboardType?: "default" | "email-address";
+  readonly inputRef?: (node: TextInput | null) => void;
 }) {
   return (
     <View>
@@ -330,6 +403,7 @@ function Field({
         accessibilityLabel={label}
         accessibilityHint={error}
         autoCapitalize="none"
+        ref={inputRef}
         keyboardType={keyboardType}
         onChangeText={onChangeText}
         placeholder={label}
@@ -345,7 +419,10 @@ function Field({
         value={value}
       />
       {error ? (
-        <Text accessibilityRole="alert" style={{ color: palette.danger }}>
+        <Text
+          accessibilityRole="alert"
+          style={[styles.fieldError, { color: palette.danger }]}
+        >
           {error}
         </Text>
       ) : null}
@@ -363,18 +440,27 @@ function omitFieldError(
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  content: { padding: spacing.xl, paddingBottom: spacing.xxl },
+  content: {
+    alignSelf: "center",
+    maxWidth: 560,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl,
+    width: "100%",
+  },
   back: {
     alignItems: "center",
     flexDirection: "row",
     gap: spacing.xs,
     marginBottom: spacing.lg,
+    minHeight: 44,
+    minWidth: 44,
   },
   title: { fontSize: 28, fontWeight: "800", marginTop: spacing.lg },
   help: { fontSize: 15, lineHeight: 22, marginTop: spacing.sm },
   form: { gap: spacing.sm, marginTop: spacing.xl },
   loading: { marginTop: spacing.xl },
   label: { fontSize: 14, fontWeight: "700", marginBottom: spacing.xs },
+  fieldError: { fontSize: 13, lineHeight: 18, marginTop: spacing.xs },
   input: {
     borderRadius: radii.sm,
     borderWidth: 1,

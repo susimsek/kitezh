@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.susimsek.kitezh.mobile",
+      "sha256_cert_fingerprints": [
+        "49:C2:E1:D2:E3:7C:C3:F2:18:2A:CE:73:50:EE:16:36:9B:A2:68:92:C9:55:85:C7:12:CA:C3:72:D2:8D:DB:A6"
+      ]
+    }
+  }
+]

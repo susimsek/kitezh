@@ -8,6 +8,8 @@ import { PasskeySettings } from "./PasskeySettings";
 
 const mockRequestAccount = jest.fn();
 const mockRegisterPasskey = jest.fn();
+const mockAddAlert = jest.fn();
+const mockAddError = jest.fn();
 
 jest.mock("@/components/account/AccountAuthProvider", () => ({
   useAccountAuth: () => ({ accessToken: "access-token" }),
@@ -20,6 +22,10 @@ jest.mock("@/lib/account-api", () => ({
 
 jest.mock("@/lib/webauthn", () => ({
   registerPasskey: (...args: unknown[]) => mockRegisterPasskey(...args),
+}));
+
+jest.mock("@/components/auth/ConsoleAlerts", () => ({
+  useConsoleAlerts: () => ({ addAlert: mockAddAlert, addError: mockAddError }),
 }));
 
 function renderSettings() {
@@ -40,6 +46,8 @@ describe("passkey account settings", () => {
   beforeEach(() => {
     mockRequestAccount.mockReset();
     mockRegisterPasskey.mockReset();
+    mockAddAlert.mockReset();
+    mockAddError.mockReset();
     Object.defineProperty(window, "PublicKeyCredential", {
       configurable: true,
       value: function PublicKeyCredential() {},
@@ -89,6 +97,87 @@ describe("passkey account settings", () => {
     renderSettings();
 
     expect(await screen.findByText(dictionary.account.security.passkeys.empty)).toBeVisible();
+  });
+
+  it("shows unsupported WebAuthn when the browser has no credential API", async () => {
+    Object.defineProperty(window, "PublicKeyCredential", {
+      configurable: true,
+      value: undefined,
+    });
+    mockRequestAccount.mockResolvedValue({
+      content: [],
+      page: { number: 0, size: 20, totalElements: 0, totalPages: 0 },
+    });
+
+    renderSettings();
+
+    expect(await screen.findByText(dictionary.account.security.passkeys.unsupported)).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: dictionary.account.security.passkeys.add }),
+    ).toBeDisabled();
+  });
+
+  it("handles a blank credential label and reports rename and removal failures", async () => {
+    mockRequestAccount.mockResolvedValue({
+      content: [
+        {
+          credentialId: "credential-id",
+          label: "",
+          createdAt: "2026-01-01T00:00:00Z",
+          lastUsedAt: "2026-01-02T00:00:00Z",
+          transports: [],
+          backupEligible: false,
+          backupState: false,
+          signatureCount: 0,
+          uvInitialized: false,
+        },
+      ],
+      page: { number: 0, size: 20, totalElements: 1, totalPages: 1 },
+    });
+
+    renderSettings();
+
+    expect(await screen.findByText(dictionary.account.security.passkeys.unnamed)).toBeVisible();
+    expect(screen.getByText(dictionary.account.security.passkeys.transportUnknown)).toBeVisible();
+    expect(
+      screen
+        .getByRole("button", {
+          name: `${dictionary.account.security.passkeys.remove}: ${dictionary.account.security.passkeys.unnamed}`,
+        })
+        .closest(".account-session-card"),
+    ).toHaveTextContent(dictionary.account.security.passkeys.no);
+    const rowLabel = screen.getAllByLabelText(dictionary.account.security.passkeys.label).at(-1)!;
+    fireEvent.change(rowLabel, { target: { value: "Renamed credential" } });
+    mockRequestAccount.mockRejectedValueOnce(new Error("rename failed"));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: dictionary.account.security.passkeys.rename }).at(-1)!,
+    );
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.account.security.passkeys.renameError),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `${dictionary.account.security.passkeys.remove}: ${dictionary.account.security.passkeys.unnamed}`,
+      }),
+    );
+    mockRequestAccount.mockRejectedValueOnce(new Error("remove failed"));
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: new RegExp(`^${dictionary.account.security.passkeys.remove}$`),
+      }),
+    );
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.account.security.passkeys.removeError),
+    );
+  });
+
+  it("renders an error state when credentials cannot be loaded", async () => {
+    mockRequestAccount.mockRejectedValue(new Error("load failed"));
+
+    renderSettings();
+
+    expect(await screen.findByText(dictionary.account.security.passkeys.error)).toBeVisible();
   });
 
   it("adds, renames, and reports passkey operation failures", async () => {

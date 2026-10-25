@@ -1,6 +1,7 @@
 package io.github.susimsek.kitezh.web.account;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -51,6 +52,56 @@ class RequiredActionControllerTest {
                         request.getRemoteAddr(),
                         request.getHeader("User-Agent"),
                         session.getId());
+    }
+
+    @Test
+    void handlesMissingRecoveryServiceAndOptionalCompletionBody() {
+        RequiredActionService requiredActionService = mock(RequiredActionService.class);
+        Authentication authentication = mock(Authentication.class);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        when(authentication.getName()).thenReturn("alice");
+        RequiredActionController unavailableController =
+                new RequiredActionController(requiredActionService, mock(MfaService.class));
+
+        assertThatThrownBy(() -> unavailableController.setupRecoveryCodes(authentication))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Recovery code service is unavailable");
+        assertThat(
+                        unavailableController
+                                .complete("UPDATE_PROFILE", null, authentication, request)
+                                .getStatusCode()
+                                .value())
+                .isEqualTo(204);
+        verify(requiredActionService)
+                .completeInSession(
+                        "alice", "UPDATE_PROFILE", null, request.getRemoteAddr(), null, null);
+    }
+
+    @Test
+    void completedNonTotpActionDoesNotMarkVerifiedSession() {
+        RequiredActionService requiredActionService = mock(RequiredActionService.class);
+        Authentication authentication = mock(Authentication.class);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        var session = request.getSession();
+        when(authentication.getName()).thenReturn("alice");
+        when(requiredActionService.completeInSession(
+                        "alice",
+                        "UPDATE_PROFILE",
+                        Map.of(),
+                        request.getRemoteAddr(),
+                        null,
+                        session.getId()))
+                .thenReturn(true);
+        RequiredActionController controller =
+                new RequiredActionController(requiredActionService, mock(MfaService.class));
+
+        controller.complete(
+                "UPDATE_PROFILE",
+                new RequiredActionCompleteRequestDTO(Map.of()),
+                authentication,
+                request);
+
+        assertThat(session.getAttribute(MfaAuthorizationFilter.MFA_VERIFIED)).isNull();
     }
 
     @Test

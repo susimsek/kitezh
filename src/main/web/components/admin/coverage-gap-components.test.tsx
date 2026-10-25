@@ -267,6 +267,57 @@ describe("previously uncovered administration components", () => {
     );
   });
 
+  it("validates client scope fields and keeps the editor open after a rejected save", async () => {
+    const scope = {
+      id: "profile",
+      name: "profile",
+      displayName: "Profile",
+      description: "Basic profile",
+      createdAt: "2026-01-01",
+      updatedAt: "2026-01-01",
+      builtIn: false,
+    };
+    mockAdminRequest
+      .mockResolvedValueOnce(page([scope]) as never)
+      .mockResolvedValueOnce({ status: 500, data: null } as never);
+
+    render(<ClientScopesTable dictionary={dictionary} />);
+    expect(await screen.findByText("profile")).toBeVisible();
+    fireEvent.click(screen.getByText(dictionary.admin.clientScopes.edit));
+
+    fireEvent.change(document.querySelector('input[name="name"]')!, {
+      target: { value: " " },
+    });
+    fireEvent.change(document.querySelector('input[name="displayName"]')!, {
+      target: { value: "d".repeat(201) },
+    });
+    fireEvent.change(document.querySelector('textarea[name="description"]')!, {
+      target: { value: "d".repeat(501) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
+
+    expect(await screen.findByText(dictionary.admin.common.validation.required)).toBeVisible();
+    expect(screen.getByText(dictionary.admin.common.validation.max200)).toBeVisible();
+    expect(screen.getByText(dictionary.admin.common.validation.max500)).toBeVisible();
+    expect(mockAdminRequest).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(document.querySelector('input[name="name"]')!, {
+      target: { value: "profile-v2" },
+    });
+    fireEvent.change(document.querySelector('input[name="displayName"]')!, {
+      target: { value: "Profile v2" },
+    });
+    fireEvent.change(document.querySelector('textarea[name="description"]')!, {
+      target: { value: "Updated profile" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: dictionary.admin.common.save }));
+
+    await waitFor(() =>
+      expect(mockAddError).toHaveBeenCalledWith(dictionary.admin.clientScopes.operationError),
+    );
+    expect(screen.getByRole("dialog")).toBeVisible();
+  });
+
   it("renders server information, copies endpoints, and handles endpoint failures", async () => {
     const info = {
       issuer: "http://localhost:9090",
@@ -489,6 +540,10 @@ describe("previously uncovered administration components", () => {
       scopes: ["openid", "profile", "email", "admin-api", "account-api"],
       requireAuthorizationConsent: true,
       requireProofKey: true,
+      requireDpop: true,
+      requireDpopJkt: true,
+      dpopRefreshTokenOnly: true,
+      dpopSigningAlgorithms: ["ES256", "RS256"],
     };
     mockAdminRequest.mockResolvedValueOnce(page([client]) as never);
     const clientsView = render(<ClientsTable dictionary={dictionary} locale="en" />);
@@ -497,6 +552,9 @@ describe("previously uncovered administration components", () => {
     expect(screen.getByText("+1")).toBeVisible();
     expect(screen.getByText("authorization_code")).toBeVisible();
     expect(screen.getByText("PKCE On")).toBeVisible();
+    expect(screen.getByText("dpop_jkt On")).toBeVisible();
+    expect(screen.getByText("DPoP refresh")).toBeVisible();
+    expect(screen.getByText("DPoP ES256/RS256")).toBeVisible();
 
     clientsView.unmount();
     authState.access = {

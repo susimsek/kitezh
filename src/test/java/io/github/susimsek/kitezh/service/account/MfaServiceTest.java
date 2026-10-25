@@ -221,6 +221,21 @@ class MfaServiceTest {
     }
 
     @Test
+    void stepUpVerificationAlwaysConsumesEachTotpCounterOnce() {
+        UserEntity user = user(true, "SECRET");
+        LoginSettingsEntity settings = settings(true);
+        settings.setOtpCodeReusable(true);
+        when(userRepository.findForMfaUpdate("alice")).thenReturn(Optional.of(user));
+        when(loginSettingsRepository.findById(1L)).thenReturn(Optional.of(settings));
+        when(totpService.matchingCounter("SECRET", "123456", "SHA1", 6, 30, 1))
+                .thenReturn(OptionalLong.of(100L));
+
+        assertThat(service().validForStepUp("alice", "123456")).isTrue();
+        assertThat(service().validForStepUp("alice", "123456")).isFalse();
+        assertThat(user.getTotpLastUsedCounter()).isEqualTo(100L);
+    }
+
+    @Test
     void reportsMfaStatusFromUserAndLoginSettings() {
         UserEntity user = user(false, "SECRET");
         LoginSettingsEntity settings = settings(true);

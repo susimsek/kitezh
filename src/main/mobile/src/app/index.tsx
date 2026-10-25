@@ -61,6 +61,7 @@ export default function HomeScreen() {
           <AppIcon name="arrowRight" size={16} color={palette.onPrimary} />
         </Pressable>
         <Pressable
+          testID="landing-settings"
           accessibilityRole="button"
           accessibilityLabel={dictionary.settings}
           onPress={() => router.push("/settings")}

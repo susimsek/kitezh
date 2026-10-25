@@ -51,6 +51,7 @@ import { AccountSessions } from "@/components/account/AccountSessions";
 import { AccountApplications } from "@/components/account/AccountApplications";
 import { AccountDeleteForm } from "@/components/account/AccountDeleteForm";
 import { SocialAccountLinks } from "@/components/account/SocialAccountLinks";
+import { PersonalAccessTokens } from "@/components/account/PersonalAccessTokens";
 import { CibaApprovalPanel } from "@/components/account/CibaApprovalPanel";
 import { UserProfileAttributeForm } from "@/components/admin/UserProfileAttributeForm";
 import { AuthLayout } from "@/components/auth/AuthLayout";
@@ -214,6 +215,7 @@ function AccountPage({
         <>
           <AccountPasswordForm dictionary={d} />
           <SocialAccountLinks dictionary={d} />
+          <PersonalAccessTokens dictionary={d} />
           <CibaApprovalPanel dictionary={d} />
           <MfaSettings dictionary={d} />
           <PasskeySettings dictionary={d} />

@@ -54,6 +54,9 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.StaticApplicationContext;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.ObjectPostProcessor;
@@ -77,8 +80,12 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationServerMetadata;
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType;
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeActor;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeAuthenticationToken;
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2TokenExchangeCompositeAuthenticationToken;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.context.AuthorizationServerContext;
 import org.springframework.security.oauth2.server.authorization.oidc.OidcProviderConfiguration;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
@@ -134,7 +141,8 @@ class AuthorizationServerConfigTest {
                         "grant_types_supported",
                         List.of(
                                 AuthorizationGrantTypes.CIBA,
-                                AuthorizationGrantTypes.TOKEN_EXCHANGE));
+                                AuthorizationGrantTypes.TOKEN_EXCHANGE,
+                                AuthorizationGrantTypes.UMA_TICKET));
 
         OidcProviderConfiguration.Builder oidcBuilder =
                 OidcProviderConfiguration.builder()
@@ -179,6 +187,31 @@ class AuthorizationServerConfigTest {
 
         assertThat(jwtEncoder).isNotNull();
         assertThat(tokenGenerator).isNotNull();
+        assertThat(
+                        config.tokenGenerator(
+                                jwtEncoder,
+                                context -> context.getClaims().claim("test", true),
+                                mock(
+                                        io.github.susimsek.kitezh.service.security
+                                                .OAuth2ObservabilityMetrics.class),
+                                mock(
+                                        io.github.susimsek.kitezh.service.admin
+                                                .OfflineAccessPolicyService.class)))
+                .isNotNull();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void rejectsJwtEncodingWhenNoPrivateSigningKeyIsAvailable() {
+        JwtEncoder jwtEncoder = config.jwtEncoder(config.jwkSource(mock(OAuth2KeyService.class)));
+        Converter<List<JWK>, JWK> selector =
+                (Converter<List<JWK>, JWK>)
+                        org.springframework.test.util.ReflectionTestUtils.getField(
+                                jwtEncoder, "jwkSelector");
+
+        assertThatThrownBy(() -> selector.convert(List.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("No private OAuth2 signing key is available");
     }
 
     @Test
@@ -195,6 +228,7 @@ class AuthorizationServerConfigTest {
                                         org.springframework.security.crypto.password.PasswordEncoder
                                                 .class),
                                 mock(CibaAuthenticationGrantAuthenticationProvider.class),
+                                mock(UmaTicketAuthenticationProvider.class),
                                 mock(TokenExchangeAuthenticationProvider.class),
                                 mock(SocialProviderLogoutSuccessHandler.class),
                                 mock(SecurityContextRepository.class),
@@ -215,12 +249,89 @@ class AuthorizationServerConfigTest {
                         mock(RequiredActionAuthorizationFilter.class),
                         mock(MfaAuthorizationFilter.class),
                         mock(CibaAuthenticationGrantAuthenticationProvider.class),
+                        mock(UmaTicketAuthenticationProvider.class),
                         mock(TokenExchangeAuthenticationProvider.class),
                         mock(SocialProviderLogoutSuccessHandler.class),
                         mock(SecurityContextRepository.class),
                         new LoggingProperties());
 
         assertThat(chain).isNotNull();
+    }
+
+    @Test
+    void publishesCibaMetadataForAuthorizationServerAndOidcDiscovery() throws Exception {
+        SecurityFilterChain chain =
+                config.authorizationServerSecurityFilterChain(
+                        httpSecurity(),
+                        mock(OAuth2TokenGenerator.class),
+                        mock(RegisteredClientRepository.class),
+                        new AuthorizationServerConfig.AuthorizationServerFilterDependencies(
+                                mock(RequiredActionAuthorizationFilter.class),
+                                mock(MfaAuthorizationFilter.class),
+                                mock(
+                                        org.springframework.security.crypto.password.PasswordEncoder
+                                                .class),
+                                mock(CibaAuthenticationGrantAuthenticationProvider.class),
+                                mock(UmaTicketAuthenticationProvider.class),
+                                mock(TokenExchangeAuthenticationProvider.class),
+                                mock(SocialProviderLogoutSuccessHandler.class),
+                                mock(SecurityContextRepository.class),
+                                new ObservabilityMdcFilter()));
+        var metadataFilter =
+                chain.getFilters().stream()
+                        .filter(
+                                org.springframework.security.oauth2.server.authorization.web
+                                                .OAuth2AuthorizationServerMetadataEndpointFilter
+                                                .class
+                                        ::isInstance)
+                        .map(
+                                org.springframework.security.oauth2.server.authorization.web
+                                                .OAuth2AuthorizationServerMetadataEndpointFilter
+                                                .class
+                                        ::cast)
+                        .findFirst()
+                        .orElseThrow();
+        AuthorizationServerContext serverContext = mock(AuthorizationServerContext.class);
+        AuthorizationServerSettings serverSettings =
+                AuthorizationServerSettings.builder().issuer("https://issuer.example").build();
+        when(serverContext.getAuthorizationServerSettings()).thenReturn(serverSettings);
+        when(serverContext.getIssuer()).thenReturn("https://issuer.example");
+        org.springframework.security.oauth2.server.authorization.context
+                .AuthorizationServerContextHolder.setContext(serverContext);
+        var authorizationMetadataResponse = new MockHttpServletResponse();
+
+        metadataFilter.doFilter(
+                new MockHttpServletRequest("GET", "/.well-known/oauth-authorization-server"),
+                authorizationMetadataResponse,
+                (request, response) -> {});
+
+        assertThat(authorizationMetadataResponse.getStatus()).isEqualTo(200);
+        assertThat(authorizationMetadataResponse.getContentAsString())
+                .contains("backchannel_user_code_parameter");
+
+        var oidcFilter =
+                chain.getFilters().stream()
+                        .filter(
+                                org.springframework.security.oauth2.server.authorization.oidc.web
+                                                .OidcProviderConfigurationEndpointFilter.class
+                                        ::isInstance)
+                        .map(
+                                org.springframework.security.oauth2.server.authorization.oidc.web
+                                                .OidcProviderConfigurationEndpointFilter.class
+                                        ::cast)
+                        .findFirst()
+                        .orElseThrow();
+        var oidcMetadataResponse = new MockHttpServletResponse();
+        oidcFilter.doFilter(
+                new MockHttpServletRequest("GET", "/.well-known/openid-configuration"),
+                oidcMetadataResponse,
+                (request, response) -> {});
+
+        assertThat(oidcMetadataResponse.getStatus()).isEqualTo(200);
+        assertThat(oidcMetadataResponse.getContentAsString())
+                .contains("backchannel_user_code_parameter");
+        org.springframework.security.oauth2.server.authorization.context
+                .AuthorizationServerContextHolder.resetContext();
     }
 
     @Test
@@ -488,6 +599,180 @@ class AuthorizationServerConfigTest {
 
         assertThat(claims.build().getClaims())
                 .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"));
+    }
+
+    @Test
+    void addsMcpAndAdminApiAudiencesToMcpReadAccessTokens() {
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+
+        config.jwtTokenCustomizer(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "mcp-client",
+                                Set.of("mcp.read")));
+
+        assertThat(claims.build().getAudience())
+                .containsExactly("https://kitezh-mcp.onrender.com/mcp", "admin-api");
+    }
+
+    @Test
+    void addsMcpAndAdminApiAudiencesToMcpWriteAccessTokens() {
+        UserEntity user = new UserEntity();
+        user.setAuthorities(Set.of(new AuthorityEntity(1L, "ROLE_USER_MANAGER")));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "mcp-client",
+                                Set.of("mcp.write")));
+
+        assertThat(claims.build().getAudience())
+                .containsExactly("https://kitezh-mcp.onrender.com/mcp", "admin-api");
+        assertThat(claims.build().getClaims()).containsEntry("roles", List.of("ROLE_USER_MANAGER"));
+    }
+
+    @Test
+    void addsOnlyAllowedRolesToMcpReadAccessTokens() {
+        UserEntity user = new UserEntity();
+        user.setAuthorities(
+                Set.of(
+                        new AuthorityEntity(1L, "ROLE_ADMIN"),
+                        new AuthorityEntity(2L, "ROLE_USER"),
+                        new AuthorityEntity(3L, "ROLE_SUPER_SECRET")));
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "mcp-client",
+                                Set.of("mcp.read")));
+
+        assertThat(claims.build().getClaims())
+                .containsEntry("roles", List.of("ROLE_ADMIN", "ROLE_USER"));
+        verify(userRepository).findByUsername("admin");
+    }
+
+    @Test
+    void supportsCustomMcpResourceAudience() {
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder();
+        AuthorizationServerConfig.JwtTokenCustomizerDependencies dependencies =
+                new AuthorizationServerConfig.JwtTokenCustomizerDependencies(
+                        mock(UserRepository.class),
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        false,
+                        null,
+                        null,
+                        null);
+
+        config.jwtTokenCustomizer(dependencies, "https://mcp.example.org/mcp")
+                .customize(
+                        jwtContext(
+                                claims,
+                                OAuth2TokenType.ACCESS_TOKEN,
+                                AuthorizationGrantType.AUTHORIZATION_CODE,
+                                "mcp-client",
+                                Set.of("mcp.read")));
+
+        assertThat(claims.build().getAudience())
+                .containsExactly("https://mcp.example.org/mcp", "admin-api");
+    }
+
+    @Test
+    void genericTokenExchangeKeepsActorClaimWithoutMcpAdminRoleElevation() {
+        RegisteredClient client =
+                RegisteredClient.withId("service-client-id")
+                        .clientId("service-client")
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
+                        .build();
+        OAuth2ClientAuthenticationToken clientPrincipal =
+                new OAuth2ClientAuthenticationToken(
+                        client, ClientAuthenticationMethod.CLIENT_SECRET_BASIC, "secret");
+        OAuth2TokenExchangeAuthenticationToken grant =
+                new OAuth2TokenExchangeAuthenticationToken(
+                        "urn:ietf:params:oauth:token-type:access_token",
+                        "subject-token",
+                        "urn:ietf:params:oauth:token-type:access_token",
+                        clientPrincipal,
+                        null,
+                        null,
+                        null,
+                        Set.of("admin-api"),
+                        Set.of("admin-api", "roles"),
+                        Map.of());
+        JwtClaimsSet.Builder claims = JwtClaimsSet.builder().claim("sub", "admin");
+        UsernamePasswordAuthenticationToken subjectPrincipal =
+                new UsernamePasswordAuthenticationToken(
+                        "admin",
+                        "n/a",
+                        List.of(
+                                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                                new SimpleGrantedAuthority("ROLE_USER")));
+        OAuth2TokenExchangeCompositeAuthenticationToken compositePrincipal =
+                new OAuth2TokenExchangeCompositeAuthenticationToken(
+                        subjectPrincipal,
+                        List.of(
+                                new OAuth2TokenExchangeActor(
+                                        Map.of(
+                                                "sub",
+                                                "service-client",
+                                                "iat",
+                                                Instant.now(),
+                                                "exp",
+                                                Instant.now().plusSeconds(120)))));
+        JwtEncodingContext context =
+                JwtEncodingContext.with(JwsHeader.with(SignatureAlgorithm.RS256), claims)
+                        .registeredClient(client)
+                        .principal(compositePrincipal)
+                        .authorizedScopes(Set.of("admin-api", "roles"))
+                        .tokenType(OAuth2TokenType.ACCESS_TOKEN)
+                        .authorizationGrantType(
+                                new AuthorizationGrantType(AuthorizationGrantTypes.TOKEN_EXCHANGE))
+                        .authorizationGrant(grant)
+                        .build();
+        UserRepository userRepository = mock(UserRepository.class);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(new UserEntity()));
+
+        config.jwtTokenCustomizer(
+                        userRepository,
+                        mock(UserAvatarRepository.class),
+                        mock(AuthorizationRepository.class))
+                .customize(context);
+
+        assertThat(claims.build().getClaims())
+                .doesNotContainKey("roles")
+                .containsEntry("act", Map.of("sub", "service-client"));
+        verify(userRepository, never()).findByUsername(anyString());
     }
 
     @Test

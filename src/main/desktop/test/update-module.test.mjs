@@ -59,6 +59,7 @@ const runtime = {
     isUpdateAvailable: true,
     updateInfo: { version: "0.1.4" },
   }),
+  releaseMetadataResponse: null,
   updateDownload: async () => undefined,
 };
 const successfulManifestFetch = runtime.netFetch;
@@ -203,6 +204,33 @@ test("configures the updater, checks signed release metadata, and reports update
   else process.env.DESKTOP_AUTO_UPDATE = previousAutoUpdate;
 });
 
+test("checks unsigned update manifests when no verification key is bundled", async () => {
+  const originalAppPath = runtime.appPath;
+  const unsignedAppPath = path.join(updateDirectory, "unsigned-build");
+  await mkdir(path.join(unsignedAppPath, "assets"), { recursive: true });
+  runtime.appPath = unsignedAppPath;
+  runtime.netFetch = async (url) => {
+    if (url.endsWith(".sig")) return { status: 404, ok: false };
+    return {
+      status: 200,
+      ok: true,
+      arrayBuffer: async () => signedManifest,
+    };
+  };
+  const beforeCheck = publishedStatuses.length;
+
+  try {
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(beforeCheck), [
+      { state: "checking" },
+      { state: "available", version: "0.1.4" },
+    ]);
+  } finally {
+    runtime.appPath = originalAppPath;
+    runtime.netFetch = successfulManifestFetch;
+  }
+});
+
 test("returns download results and publishes download errors", async () => {
   runtime.updateDownload = async () => undefined;
   assert.equal(await update.downloadUpdate(), true);
@@ -238,6 +266,37 @@ test("fails closed when the signed manifest or updater metadata is unavailable",
     assert.equal(await update.downloadUpdate(), false);
 
     runtime.netFetch = successfulManifestFetch;
+    const beforeMissingSignature = publishedStatuses.length;
+    runtime.netFetch = async (url) =>
+      url.endsWith(".sig")
+        ? { status: 404, ok: false }
+        : {
+            status: 200,
+            ok: true,
+            arrayBuffer: async () => signedManifest,
+          };
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(beforeMissingSignature), [
+      { state: "checking" },
+      { state: "error", message: "Desktop update could not be checked." },
+    ]);
+
+    runtime.netFetch = async (url) =>
+      url.endsWith(".sig")
+        ? { status: 503, ok: false }
+        : {
+            status: 200,
+            ok: true,
+            arrayBuffer: async () => signedManifest,
+          };
+    const beforeFailedSignatureRequest = publishedStatuses.length;
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(beforeFailedSignatureRequest), [
+      { state: "checking" },
+      { state: "error", message: "Desktop update could not be checked." },
+    ]);
+
+    runtime.netFetch = successfulManifestFetch;
     runtime.updateCheck = async () => null;
     const beforeMissingMetadata = publishedStatuses.length;
     await update.checkForUpdates();
@@ -259,6 +318,16 @@ test("fails closed when the signed manifest or updater metadata is unavailable",
 
     runtime.updateCheck = async () => ({
       isUpdateAvailable: true,
+      updateInfo: { version: "0.1.5" },
+    });
+    const beforeMetadataMismatch = publishedStatuses.length;
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(beforeMetadataMismatch), [
+      { state: "checking" },
+      { state: "error", message: "Desktop update could not be checked." },
+    ]);
+    runtime.updateCheck = async () => ({
+      isUpdateAvailable: true,
       updateInfo: { version: "0.1.4" },
     });
     await update.checkForUpdates();
@@ -278,6 +347,136 @@ test("fails closed when the signed manifest or updater metadata is unavailable",
       isUpdateAvailable: true,
       updateInfo: { version: "0.1.4" },
     });
+  }
+});
+
+test("rejects non-object signed manifest metadata before comparing releases", () => {
+  assert.throws(
+    () =>
+      update.assertUpdateInfoMatchesSignedManifest(
+        Buffer.from("null", "utf8"),
+        { version: "0.1.4" },
+      ),
+    /Update manifest metadata is invalid/,
+  );
+  assert.throws(
+    () => update.assertUpdateInfoMatchesSignedManifest(signedManifest, null),
+    /Update manifest metadata is invalid/,
+  );
+});
+
+test("skips the signed manifest when shared metadata says the release is current", async () => {
+  const originalFetch = runtime.netFetch;
+  const originalVersion = runtime.version;
+  const requests = [];
+  runtime.releaseMetadataResponse = {
+    status: 200,
+    ok: true,
+    json: async () => ({
+      tag: `v${runtime.version}`,
+      version: runtime.version,
+      releaseUrl: `https://github.com/susimsek/kitezh/releases/tag/v${runtime.version}`,
+      assets: {
+        windowsInstaller: `https://github.com/susimsek/kitezh/releases/download/v${runtime.version}/kitezh.exe`,
+        macosAppleSilicon: `https://github.com/susimsek/kitezh/releases/download/v${runtime.version}/kitezh-macos-arm64.dmg`,
+        macosIntel: `https://github.com/susimsek/kitezh/releases/download/v${runtime.version}/kitezh-macos-x64.dmg`,
+        linuxX64AppImage: `https://github.com/susimsek/kitezh/releases/download/v${runtime.version}/kitezh-linux-x64.AppImage`,
+        linuxArm64AppImage: `https://github.com/susimsek/kitezh/releases/download/v${runtime.version}/kitezh-linux-arm64.AppImage`,
+      },
+    }),
+  };
+  runtime.netFetch = async (url) => {
+    requests.push(url);
+    if (url.endsWith("/api/public/app-release"))
+      return runtime.releaseMetadataResponse;
+    return originalFetch(url);
+  };
+
+  try {
+    const before = publishedStatuses.length;
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(before), [
+      { state: "checking" },
+      { state: "not-available" },
+    ]);
+    assert.deepEqual(requests, [
+      "https://kitezh.onrender.com/api/public/app-release",
+    ]);
+  } finally {
+    runtime.netFetch = originalFetch;
+    runtime.version = originalVersion;
+    runtime.releaseMetadataResponse = null;
+    await update.checkForUpdates();
+  }
+});
+
+test("checks the signed updater manifest when shared release metadata is newer", async () => {
+  const originalSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay, ...args) =>
+    delay === 5_000
+      ? /** @type {NodeJS.Timeout} */ ({})
+      : originalSetTimeout(callback, delay, ...args);
+  update.configureAutoUpdater((status) => publishedStatuses.push(status));
+  globalThis.setTimeout = originalSetTimeout;
+  const requests = [];
+  const assetKey =
+    process.platform === "win32"
+      ? "windowsInstaller"
+      : process.platform === "darwin"
+        ? process.arch === "arm64"
+          ? "macosAppleSilicon"
+          : "macosIntel"
+        : process.arch === "arm64"
+          ? "linuxArm64AppImage"
+          : "linuxX64AppImage";
+  const manifestName =
+    process.platform === "darwin"
+      ? "latest-mac.yml"
+      : process.platform === "win32"
+        ? "latest.yml"
+        : "latest-linux.yml";
+  const originalFetch = runtime.netFetch;
+  const originalUpdateCheck = runtime.updateCheck;
+  runtime.releaseMetadataResponse = {
+    status: 200,
+    ok: true,
+    json: async () => ({
+      tag: "v0.1.5",
+      version: "0.1.5",
+      releaseUrl: "https://github.com/susimsek/kitezh/releases/tag/v0.1.5",
+      assets: {
+        [assetKey]:
+          "https://github.com/susimsek/kitezh/releases/download/v0.1.5/kitezh-installer",
+      },
+    }),
+  };
+  runtime.netFetch = async (url) => {
+    requests.push(url);
+    if (url.endsWith("/api/public/app-release"))
+      return runtime.releaseMetadataResponse;
+    return originalFetch(url);
+  };
+  runtime.updateCheck = async () => ({
+    isUpdateAvailable: true,
+    updateInfo: { version: "0.1.4" },
+  });
+
+  try {
+    const before = publishedStatuses.length;
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(before), [
+      { state: "checking" },
+      { state: "available", version: "0.1.4" },
+    ]);
+    assert.deepEqual(requests, [
+      "https://kitezh.onrender.com/api/public/app-release",
+      `https://github.com/susimsek/kitezh/releases/latest/download/${manifestName}`,
+      `https://github.com/susimsek/kitezh/releases/latest/download/${manifestName}.sig`,
+    ]);
+  } finally {
+    runtime.netFetch = originalFetch;
+    runtime.updateCheck = originalUpdateCheck;
+    runtime.releaseMetadataResponse = null;
   }
 });
 
@@ -407,5 +606,127 @@ test("keeps unsupported update installs disabled and reports backup preparation 
     if (previousPreview === undefined)
       delete process.env.DESKTOP_UPDATE_PREVIEW;
     else process.env.DESKTOP_UPDATE_PREVIEW = previousPreview;
+  }
+});
+
+test("macOS updater selects its manifest and backs up the application bundle", async () => {
+  const platformDescriptor = Object.getOwnPropertyDescriptor(
+    process,
+    "platform",
+  );
+  const originalNetFetch = runtime.netFetch;
+  let manifestUrl = "";
+  Object.defineProperty(process, "platform", {
+    ...platformDescriptor,
+    value: "darwin",
+  });
+  runtime.netFetch = async (url) => {
+    manifestUrl = url;
+    return successfulManifestFetch(url);
+  };
+  try {
+    update.configureAutoUpdater((status) => publishedStatuses.push(status));
+    runtime.packaged = true;
+    runtime.updateCheck = async () => ({
+      isUpdateAvailable: true,
+      updateInfo: { version: "0.1.4" },
+    });
+    await update.checkForUpdates();
+    assert.match(manifestUrl, /latest-mac\.yml(?:\.sig)?$/);
+    updateHandlers.get("update-downloaded")({ version: "0.1.4" });
+    updateOperations.length = 0;
+    const installedBefore = quitAndInstallCalls;
+    update.installUpdate();
+    for (
+      let turn = 0;
+      turn < 20 && quitAndInstallCalls === installedBefore;
+      turn += 1
+    )
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.ok(
+      updateOperations.some(
+        ({ operation, args }) =>
+          operation === "cp" &&
+          args[1].includes("desktop-update-backup-") &&
+          args[2]?.recursive === true,
+      ),
+    );
+    assert.equal(quitAndInstallCalls, installedBefore + 1);
+  } finally {
+    runtime.netFetch = originalNetFetch;
+    Object.defineProperty(process, "platform", platformDescriptor);
+  }
+});
+
+test("Windows updater selects its manifest and backs up the install directory", async () => {
+  const platformDescriptor = Object.getOwnPropertyDescriptor(
+    process,
+    "platform",
+  );
+  const originalNetFetch = runtime.netFetch;
+  const originalReleaseMetadata = runtime.releaseMetadataResponse;
+  const originalUpdateCheck = runtime.updateCheck;
+  const requests = [];
+  Object.defineProperty(process, "platform", {
+    ...platformDescriptor,
+    value: "win32",
+  });
+  runtime.releaseMetadataResponse = {
+    status: 200,
+    ok: true,
+    json: async () => ({
+      tag: "v0.1.5",
+      version: "0.1.5",
+      releaseUrl: "https://github.com/susimsek/kitezh/releases/tag/v0.1.5",
+      assets: {
+        windowsInstaller:
+          "https://github.com/susimsek/kitezh/releases/download/v0.1.5/kitezh.exe",
+      },
+    }),
+  };
+  runtime.netFetch = async (url) => {
+    requests.push(url);
+    if (url.endsWith("/api/public/app-release"))
+      return runtime.releaseMetadataResponse;
+    return originalNetFetch(url);
+  };
+  runtime.updateCheck = async () => ({
+    isUpdateAvailable: true,
+    updateInfo: { version: "0.1.4" },
+  });
+
+  try {
+    const before = publishedStatuses.length;
+    await update.checkForUpdates();
+    assert.deepEqual(publishedStatuses.slice(before), [
+      { state: "checking" },
+      { state: "available", version: "0.1.4" },
+    ]);
+    assert.ok(requests.some((url) => url.endsWith("/latest.yml")));
+
+    updateHandlers.get("update-downloaded")({ version: "0.1.4" });
+    updateOperations.length = 0;
+    const installedBefore = quitAndInstallCalls;
+    update.installUpdate();
+    for (
+      let turn = 0;
+      turn < 20 && quitAndInstallCalls === installedBefore;
+      turn += 1
+    )
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.ok(
+      updateOperations.some(
+        ({ operation, args }) =>
+          operation === "cp" &&
+          args[1].includes("desktop-update-backup-") &&
+          args[2]?.recursive === true,
+      ),
+    );
+    assert.equal(quitAndInstallCalls, installedBefore + 1);
+  } finally {
+    runtime.netFetch = originalNetFetch;
+    runtime.releaseMetadataResponse = originalReleaseMetadata;
+    runtime.updateCheck = originalUpdateCheck;
+    Object.defineProperty(process, "platform", platformDescriptor);
   }
 });

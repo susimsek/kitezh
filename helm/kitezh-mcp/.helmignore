@@ -1,0 +1,10 @@
+.git/
+.gitignore
+*.swp
+*.bak
+*.tmp
+*.orig
+*.rej
+*~
+.DS_Store
+Thumbs.db

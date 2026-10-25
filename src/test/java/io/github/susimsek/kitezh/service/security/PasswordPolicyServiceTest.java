@@ -93,6 +93,21 @@ class PasswordPolicyServiceTest {
     }
 
     @Test
+    void rejectsBlankAndOverMaximumPasswords() {
+        ApplicationProperties.PasswordPolicy policy =
+                new ApplicationProperties.PasswordPolicy(
+                        1, 8, 0, 0, 0, 0, false, false, false, 0, 0, "");
+        PasswordPolicyService service = serviceWithPolicy(policy);
+
+        assertThatThrownBy(() -> service.validate(user(), "   "))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("length");
+        assertThatThrownBy(() -> service.validate(user(), "too-long-password"))
+                .isInstanceOf(ApiException.class)
+                .hasMessageContaining("length");
+    }
+
+    @Test
     void rejectsRecentPasswordFromHistory() {
         when(applicationProperties.security()).thenReturn(security());
         when(historyRepository.findByUserIdOrderByCreatedAtDesc(7L))

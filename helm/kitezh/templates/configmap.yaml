@@ -17,3 +17,5 @@ data:
       authorization-server:
         issuer: {{ .Values.app.authorizationServer.issuer | quote }}
         offline-session-idle: {{ .Values.app.authorizationServer.offlineSessionIdle | quote }}
+    mcp:
+      resource-audience: {{ .Values.app.mcp.resourceAudience | quote }}

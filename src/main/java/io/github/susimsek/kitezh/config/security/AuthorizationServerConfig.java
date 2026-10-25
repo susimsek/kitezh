@@ -23,6 +23,7 @@ import io.github.susimsek.kitezh.repository.SocialIdentityRepository;
 import io.github.susimsek.kitezh.repository.UserAvatarRepository;
 import io.github.susimsek.kitezh.repository.UserProfileAttributeRepository;
 import io.github.susimsek.kitezh.repository.UserRepository;
+import io.github.susimsek.kitezh.security.AuthoritiesConstants;
 import io.github.susimsek.kitezh.security.AuthorizationEndpointErrorResponseHandler;
 import io.github.susimsek.kitezh.security.AuthorizationGrantTypes;
 import io.github.susimsek.kitezh.security.ClientSecuritySettings;
@@ -32,6 +33,7 @@ import io.github.susimsek.kitezh.security.OidcSessionIdentifier;
 import io.github.susimsek.kitezh.security.ProtocolMapperTypes;
 import io.github.susimsek.kitezh.security.RotatingClientSecretAuthenticationProvider;
 import io.github.susimsek.kitezh.service.OAuth2KeyService;
+import io.github.susimsek.kitezh.service.account.PersonalAccessTokenGrant;
 import io.github.susimsek.kitezh.service.admin.OfflineAccessPolicyService;
 import io.github.susimsek.kitezh.service.security.EffectiveRoleService;
 import io.github.susimsek.kitezh.service.security.OAuth2ObservabilityMetrics;
@@ -47,6 +49,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -87,6 +90,7 @@ import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
+import org.springframework.util.StringUtils;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -96,6 +100,29 @@ public class AuthorizationServerConfig {
 
     private static final MediaTypeRequestMatcher HTML_REQUEST_MATCHER = htmlRequestMatcher();
     private static final String ROLES_SCOPE = "roles";
+    private static final String MCP_READ_SCOPE = "mcp.read";
+    private static final String MCP_WRITE_SCOPE = "mcp.write";
+    private static final Set<String> MCP_ROLE_CLAIMS =
+            Set.of(
+                    AuthoritiesConstants.ADMIN,
+                    AuthoritiesConstants.USER,
+                    AuthoritiesConstants.USER_VIEWER,
+                    AuthoritiesConstants.USER_QUERY,
+                    AuthoritiesConstants.USER_MANAGER,
+                    AuthoritiesConstants.USER_IMPERSONATOR,
+                    AuthoritiesConstants.GROUP_VIEWER,
+                    AuthoritiesConstants.GROUP_QUERY,
+                    AuthoritiesConstants.GROUP_MANAGER,
+                    AuthoritiesConstants.ORGANIZATION_VIEWER,
+                    AuthoritiesConstants.ORGANIZATION_QUERY,
+                    AuthoritiesConstants.ORGANIZATION_MANAGER,
+                    AuthoritiesConstants.CLIENT_VIEWER,
+                    AuthoritiesConstants.CLIENT_QUERY,
+                    AuthoritiesConstants.CLIENT_MANAGER,
+                    AuthoritiesConstants.EVENT_VIEWER,
+                    AuthoritiesConstants.EVENT_MANAGER);
+    private static final String MCP_RESOURCE_AUDIENCE = "https://kitezh-mcp.onrender.com/mcp";
+    private static final String MCP_ADMIN_API_AUDIENCE = "admin-api";
     private static final String EMAIL_CLAIM = "email";
 
     record AuthorizationServerFilterDependencies(
@@ -103,6 +130,7 @@ public class AuthorizationServerConfig {
             MfaAuthorizationFilter mfaAuthorizationFilter,
             PasswordEncoder passwordEncoder,
             CibaAuthenticationGrantAuthenticationProvider cibaAuthenticationProvider,
+            UmaTicketAuthenticationProvider umaTicketAuthenticationProvider,
             TokenExchangeAuthenticationProvider tokenExchangeAuthenticationProvider,
             SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
             SecurityContextRepository securityContextRepository,
@@ -137,6 +165,7 @@ public class AuthorizationServerConfig {
             RequiredActionAuthorizationFilter requiredActionAuthorizationFilter,
             MfaAuthorizationFilter mfaAuthorizationFilter,
             CibaAuthenticationGrantAuthenticationProvider cibaAuthenticationProvider,
+            UmaTicketAuthenticationProvider umaTicketAuthenticationProvider,
             TokenExchangeAuthenticationProvider tokenExchangeAuthenticationProvider,
             SocialProviderLogoutSuccessHandler socialProviderLogoutSuccessHandler,
             @Qualifier("authorizationServerSecurityContextRepository")
@@ -151,6 +180,7 @@ public class AuthorizationServerConfig {
                         mfaAuthorizationFilter,
                         passwordEncoder,
                         cibaAuthenticationProvider,
+                        umaTicketAuthenticationProvider,
                         tokenExchangeAuthenticationProvider,
                         socialProviderLogoutSuccessHandler,
                         securityContextRepository,
@@ -267,13 +297,17 @@ public class AuthorizationServerConfig {
                                                         tokenEndpoint
                                                                 .accessTokenRequestConverters(
                                                                         converters ->
-                                                                                converters.add(
-                                                                                        new CibaAuthenticationGrantAuthenticationConverter()))
+                                                                                converters.addAll(
+                                                                                        List.of(
+                                                                                                new CibaAuthenticationGrantAuthenticationConverter())))
                                                                 .accessTokenRequestConverter(
                                                                         new DefaultClientScopesClientCredentialsConverter())
                                                                 .authenticationProvider(
                                                                         dependencies
                                                                                 .cibaAuthenticationProvider())
+                                                                .authenticationProvider(
+                                                                        dependencies
+                                                                                .umaTicketAuthenticationProvider())
                                                                 .authenticationProvider(
                                                                         dependencies
                                                                                 .tokenExchangeAuthenticationProvider())
@@ -328,6 +362,8 @@ public class AuthorizationServerConfig {
             String issuer) {
         addCibaMetadataClaims(builder::claim, builder::grantType, issuer);
         builder.grantType(AuthorizationGrantTypes.TOKEN_EXCHANGE);
+        builder.grantType(AuthorizationGrantTypes.UMA_TICKET);
+        builder.claim("uma2_configuration_endpoint", issuer + "/.well-known/uma2-configuration");
     }
 
     static void addCibaMetadata(
@@ -337,6 +373,8 @@ public class AuthorizationServerConfig {
             String issuer) {
         addCibaMetadataClaims(builder::claim, builder::grantType, issuer);
         builder.grantType(AuthorizationGrantTypes.TOKEN_EXCHANGE);
+        builder.grantType(AuthorizationGrantTypes.UMA_TICKET);
+        builder.claim("uma2_configuration_endpoint", issuer + "/.well-known/uma2-configuration");
     }
 
     private static void addCibaMetadataClaims(
@@ -441,7 +479,9 @@ public class AuthorizationServerConfig {
             UserProfileAttributeRepository userProfileAttributeRepository,
             SocialIdentityRepository socialIdentityRepository,
             ObjectMapper objectMapper,
-            OrganizationClaimRepository organizationClaimRepository) {
+            OrganizationClaimRepository organizationClaimRepository,
+            @Value("${app.mcp.resource-audience:https://kitezh-mcp.onrender.com/mcp}")
+                    String mcpResourceAudience) {
         return jwtTokenCustomizer(
                 new JwtTokenCustomizerDependencies(
                         userRepository,
@@ -455,7 +495,8 @@ public class AuthorizationServerConfig {
                         false,
                         socialIdentityRepository,
                         objectMapper,
-                        organizationClaimRepository));
+                        organizationClaimRepository),
+                mcpResourceAudience);
     }
 
     OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
@@ -503,10 +544,23 @@ public class AuthorizationServerConfig {
 
     OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
             JwtTokenCustomizerDependencies dependencies) {
+        return jwtTokenCustomizer(dependencies, MCP_RESOURCE_AUDIENCE);
+    }
+
+    OAuth2TokenCustomizer<JwtEncodingContext> jwtTokenCustomizer(
+            JwtTokenCustomizerDependencies dependencies, String mcpResourceAudience) {
         return context -> {
             if (OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
                 context.getClaims().claim("client_id", context.getRegisteredClient().getClientId());
             }
+            if (context.getAuthorizationGrant() instanceof PersonalAccessTokenGrant personalToken) {
+                if (personalToken.expiresAt() == null) {
+                    context.getClaims().claims(claims -> claims.remove("exp"));
+                } else {
+                    context.getClaims().expiresAt(personalToken.expiresAt());
+                }
+            }
+            appendMcpResourceAudience(context, mcpResourceAudience);
             boolean adminAccessToken = isAdminAccessToken(context);
             List<ClientScopeEntity> groupMappers =
                     groupMappers(context, dependencies.clientScopeRepository());
@@ -544,6 +598,7 @@ public class AuthorizationServerConfig {
                     context, tokenUser, dependencies.legacyAdminGroups(), adminAccessToken);
             RoleScopeMappings roleScopeMappings =
                     roleScopeMappings(context, dependencies.clientScopeRepository());
+            appendMcpRoleClaims(context, tokenUser);
             appendRealmRoleClaims(context, tokenUser, roleScopeMappings);
             appendGroupMapperClaims(context, tokenUser, groupMappers);
             appendClientRoleClaims(context, tokenUser, roleScopeMappings);
@@ -556,14 +611,43 @@ public class AuthorizationServerConfig {
             appendSessionIdClaim(context, dependencies.authorizationRepository());
             appendDpopConfirmationClaim(context);
             appendCibaAuthReqIdClaim(context);
+            appendUmaPermissionsClaim(context);
             appendTokenExchangeClaims(context);
         };
     }
 
+    @SuppressWarnings("unchecked")
+    private static void appendUmaPermissionsClaim(JwtEncodingContext context) {
+        if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
+                || !(context.getAuthorizationGrant()
+                        instanceof UmaTicketAuthenticationToken grant)) {
+            return;
+        }
+        Object permissions =
+                grant.getAdditionalParameters()
+                        .get(UmaTicketAuthenticationToken.AUTHORIZATION_PERMISSIONS);
+        if (permissions instanceof List<?> grantedPermissions && !grantedPermissions.isEmpty()) {
+            context.getClaims().claim("authorization", Map.of("permissions", grantedPermissions));
+            Object resourceServerClientId =
+                    grant.getAdditionalParameters().get("resource_server_client_id");
+            if (resourceServerClientId instanceof String clientId) {
+                context.getClaims().audience(List.of(clientId));
+            }
+        }
+    }
+
     private static boolean isAdminAccessToken(JwtEncodingContext context) {
-        return OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
-                && ConsoleClients.ADMIN_CLIENTS.contains(
-                        context.getRegisteredClient().getClientId());
+        if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())) {
+            return false;
+        }
+        return ConsoleClients.ADMIN_CLIENTS.contains(context.getRegisteredClient().getClientId());
+    }
+
+    private static void appendMcpResourceAudience(
+            JwtEncodingContext context, String mcpResourceAudience) {
+        if (isMcpAccessToken(context)) {
+            appendAudienceClaim(context, List.of(mcpResourceAudience, MCP_ADMIN_API_AUDIENCE));
+        }
     }
 
     private static List<ClientScopeEntity> groupMappers(
@@ -692,6 +776,7 @@ public class AuthorizationServerConfig {
                 || !groupMappers.isEmpty()
                 || !clientMappers.isEmpty()
                 || isRoleToken(context)
+                || isMcpAccessToken(context)
                 || isUserSocialClaimsToken(context)
                 || (organizationClaimsEnabled && isOrganizationClaimToken(context))) {
             return userRepository.findByUsername(context.getPrincipal().getName());
@@ -1099,6 +1184,23 @@ public class AuthorizationServerConfig {
         }
     }
 
+    private static void appendMcpRoleClaims(
+            JwtEncodingContext context, Optional<UserEntity> tokenUser) {
+        if (!OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
+                || !isMcpAccessToken(context)
+                || tokenUser.isEmpty()) {
+            return;
+        }
+        List<String> roles =
+                EffectiveRoleService.effectiveRoleNames(tokenUser.get()).stream()
+                        .filter(MCP_ROLE_CLAIMS::contains)
+                        .sorted()
+                        .toList();
+        if (!roles.isEmpty()) {
+            context.getClaims().claim("roles", roles);
+        }
+    }
+
     private record TokenMapper(
             String mapperType,
             String source,
@@ -1246,7 +1348,9 @@ public class AuthorizationServerConfig {
                         composite) {
             composite.getActors().stream()
                     .findFirst()
-                    .map(actor -> new java.util.LinkedHashMap<String, Object>(actor.getClaims()))
+                    .map(actor -> actor.getSubject())
+                    .filter(StringUtils::hasText)
+                    .map(subject -> Map.<String, Object>of("sub", subject))
                     .ifPresent(actor -> context.getClaims().claim("act", actor));
         }
     }
@@ -1397,6 +1501,12 @@ public class AuthorizationServerConfig {
                         || AuthorizationGrantType.CLIENT_CREDENTIALS.equals(
                                 context.getAuthorizationGrantType())
                         || isCibaGrant(context));
+    }
+
+    private static boolean isMcpAccessToken(JwtEncodingContext context) {
+        return OAuth2TokenType.ACCESS_TOKEN.equals(context.getTokenType())
+                && (context.getAuthorizedScopes().contains(MCP_READ_SCOPE)
+                        || context.getAuthorizedScopes().contains(MCP_WRITE_SCOPE));
     }
 
     private static boolean isCibaGrant(JwtEncodingContext context) {

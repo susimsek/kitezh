@@ -1,9 +1,19 @@
-import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
+import { useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
 import { useLocale } from "@/i18n/LocaleProvider";
 import { useTheme } from "@/theme/ThemeProvider";
 import { radii, spacing } from "@/theme/tokens";
+import {
+  validateAdminEditor,
+  type AdminEditorFieldError,
+} from "@/admin/admin-editor";
 
 function ActionButton({
   label,
@@ -35,13 +45,23 @@ function ActionButton({
         flexDirection: "row",
         gap: spacing.xs,
         justifyContent: "center",
-        minHeight: 46,
+        minHeight: 48,
         opacity: busy || disabled ? 0.7 : 1,
         paddingHorizontal: spacing.md,
       }}
     >
-      {busy ? <ActivityIndicator color={secondary ? palette.primary : palette.onPrimary} /> : null}
-      <Text style={{ color: secondary ? palette.text : palette.onPrimary, fontWeight: "700" }}>
+      {busy ? (
+        <ActivityIndicator
+          accessibilityLabel="Loading"
+          color={secondary ? palette.primary : palette.onPrimary}
+        />
+      ) : null}
+      <Text
+        style={{
+          color: secondary ? palette.text : palette.onPrimary,
+          fontWeight: "700",
+        }}
+      >
         {label}
       </Text>
     </Pressable>
@@ -131,15 +151,21 @@ export function AdminResourceEditor({
   onCancel,
   onSave,
   saving,
+  serverErrors,
+  onClearServerError,
 }: Readonly<{
   initial: AdminEditorState;
   onCancel: () => void;
   onSave: (values: Record<string, string>) => void;
   saving: boolean;
+  serverErrors?: Record<string, string>;
+  onClearServerError?: (field: string) => void;
 }>) {
   const { palette } = useTheme();
   const { dictionary } = useLocale();
   const [values, setValues] = useState(initial.values);
+  const [submitted, setSubmitted] = useState(false);
+  const fieldRefs = useRef<Record<string, TextInput | null>>({});
   const fields = fieldSets[initial.resource];
   const localizedLabel = (field: Field) => {
     const labels: Record<string, string> = {
@@ -172,12 +198,36 @@ export function AdminResourceEditor({
     };
     return labels[field.key] ?? field.label;
   };
-  const invalid = useMemo(
-    () =>
-      fields.some((field) => field.required && !values[field.key]?.trim()) ||
-      (initial.resource === "users" && !initial.id && (values.password?.length ?? 0) < 12),
-    [fields, initial.id, initial.resource, values],
+  const errors = validateAdminEditor(
+    initial.resource,
+    values,
+    !initial.id,
   );
+  const errorMessage = (error: AdminEditorFieldError) => {
+    switch (error) {
+      case "email":
+        return dictionary.invalidEmail;
+      case "password":
+        return dictionary.adminPasswordValidation;
+      case "role-required":
+        return dictionary.adminUserRoleRequired;
+      case "role-format":
+        return dictionary.adminRoleNameFormat;
+      case "parent-id":
+        return dictionary.adminRequired;
+      default:
+        return dictionary.adminRequired;
+    }
+  };
+  const submit = () => {
+    setSubmitted(true);
+    const firstInvalidField = fields.find((field) => errors[field.key]);
+    if (firstInvalidField) {
+      fieldRefs.current[firstInvalidField.key]?.focus();
+      return;
+    }
+    onSave(values);
+  };
   return (
     <View style={{ borderColor: palette.border, borderRadius: radii.md, borderWidth: 1, gap: spacing.sm, padding: spacing.md }}>
       <Text style={{ color: palette.text, fontSize: 18, fontWeight: "700" }}>
@@ -185,45 +235,80 @@ export function AdminResourceEditor({
       </Text>
       {fields.map((field) => (
         <View key={field.key} style={{ gap: spacing.xs }}>
-          <Text style={{ color: palette.textMuted, fontSize: 13 }}>{localizedLabel(field)}</Text>
+          <Text
+            nativeID={`admin-editor-label-${field.key}`}
+            style={{ color: palette.textMuted, fontSize: 14 }}
+          >
+            {localizedLabel(field)}
+          </Text>
           <TextInput
+            accessibilityLabel={localizedLabel(field)}
+            accessibilityLabelledBy={`admin-editor-label-${field.key}`}
+            accessibilityHint={
+              serverErrors?.[field.key] ??
+              (submitted && errors[field.key]
+                ? errorMessage(errors[field.key])
+                : undefined)
+            }
             autoCapitalize={field.key === "email" ? "none" : "sentences"}
+            keyboardType={field.key === "email" ? "email-address" : field.key === "parentId" ? "number-pad" : "default"}
+            ref={(input) => {
+              fieldRefs.current[field.key] = input;
+            }}
             editable={!saving}
             multiline={field.multiline}
-            onChangeText={(text) => setValues((current) => ({ ...current, [field.key]: text }))}
+            onChangeText={(text) => {
+              setValues((current) => ({ ...current, [field.key]: text }));
+              onClearServerError?.(field.key);
+            }}
             placeholder={localizedLabel(field)}
             placeholderTextColor={palette.textMuted}
             secureTextEntry={field.secure}
             style={{
-              borderColor: palette.border,
+              borderColor:
+                (submitted && errors[field.key]) || serverErrors?.[field.key]
+                  ? palette.danger
+                  : palette.border,
               borderRadius: radii.sm,
               borderWidth: 1,
               color: palette.text,
-              minHeight: field.multiline ? 72 : 46,
+              minHeight: field.multiline ? 72 : 48,
               paddingHorizontal: spacing.sm,
               paddingVertical: spacing.sm,
               textAlignVertical: field.multiline ? "top" : "center",
             }}
             value={values[field.key] ?? ""}
           />
+          {(submitted && errors[field.key]) || serverErrors?.[field.key] ? (
+            <Text
+              accessibilityLiveRegion="polite"
+              style={{ color: palette.danger, fontSize: 13 }}
+            >
+              {serverErrors?.[field.key] ??
+                (errors[field.key] ? errorMessage(errors[field.key]) : null)}
+            </Text>
+          ) : null}
         </View>
       ))}
-      {invalid ? (
-        <Text style={{ color: palette.danger }}>
-          {initial.resource === "users" && !initial.id && (values.password?.length ?? 0) < 12
-            ? dictionary.adminPasswordValidation
-            : dictionary.adminRequired}
-        </Text>
-      ) : null}
       <View style={{ flexDirection: "row", gap: spacing.sm }}>
-        <ActionButton label={dictionary.cancel} busy={false} onPress={onCancel} palette={palette} secondary />
+        <View style={{ flex: 1 }}>
+          <ActionButton
+            label={dictionary.cancel}
+            busy={false}
+            disabled={saving}
+            onPress={onCancel}
+            palette={palette}
+            secondary
+          />
+        </View>
+        <View style={{ flex: 1 }}>
         <ActionButton
           label={dictionary.adminSave}
           busy={saving}
-          disabled={invalid}
-          onPress={() => onSave(values)}
+          onPress={submit}
           palette={palette}
         />
+        </View>
       </View>
     </View>
   );

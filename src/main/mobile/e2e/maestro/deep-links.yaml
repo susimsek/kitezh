@@ -10,6 +10,14 @@ appId: io.github.susimsek.kitezh.mobile
     visible: "Verify your email|E-postanızı doğrulayın"
     timeout: 180000
 - openLink:
+    link: "kitezh://confirm-email?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"
+- tapOn:
+    text: "Open"
+    optional: true
+- extendedWaitUntil:
+    visible: "Confirm your new email|Yeni e-postanızı onaylayın"
+    timeout: 180000
+- openLink:
     link: "kitezh://reset-password?token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG"
 - tapOn:
     text: "Open"
