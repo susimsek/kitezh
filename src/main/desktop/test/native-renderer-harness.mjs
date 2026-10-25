@@ -32,6 +32,9 @@ function makeResponse(path, method, body) {
         queryGroups: true,
         viewGroups: true,
         manageGroups: true,
+        queryOrganizations: true,
+        viewOrganizations: true,
+        manageOrganizations: true,
         queryClients: true,
         viewClients: true,
         manageClients: true,
@@ -143,7 +146,12 @@ function makeResponse(path, method, body) {
     };
   }
   if (path === "/api/admin/client-scopes/profile" && method === "GET") {
-    return { id: "profile", name: "profile", description: "Profile scope", builtIn: false };
+    return {
+      id: "profile",
+      name: "profile",
+      description: "Profile scope",
+      builtIn: false,
+    };
   }
   if (path.startsWith("/api/admin/client-scopes?")) {
     return {
@@ -487,7 +495,7 @@ async function renderConsole(consoleName = "account", options = {}) {
   }
 
   rendererInstance += 1;
-  await import(
+  const renderer = await import(
     `${pathToFileURL(rendererPath).href}?coverage-instance=${rendererInstance}`
   );
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -496,6 +504,7 @@ async function renderConsole(consoleName = "account", options = {}) {
     api,
     calls,
     callbacks,
+    renderer,
     setResponse,
     document: dom.window.document,
     dom,

@@ -189,6 +189,11 @@ export const desktopIconMetadata = {
     unicode: "↶",
     svg: '<path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5m4-1v5l3 2"/>',
   },
+  circleInfo: {
+    labelKey: "adminServerInfo",
+    unicode: "ⓘ",
+    svg: '<circle cx="12" cy="12" r="10" fill="currentColor" stroke="none"/><path d="M12 11v5m0-8h.01" fill="none" stroke="var(--surface)" stroke-width="2.5"/>',
+  },
   sliders: {
     labelKey: "adminNavSettings",
     unicode: "☷",
@@ -215,6 +220,7 @@ export const desktopIconMetadata = {
   | "shieldHalved"
   | "key"
   | "clockRotateLeft"
+  | "circleInfo"
   | "sliders",
   { labelKey: string; unicode: string; svg?: string }
 >;

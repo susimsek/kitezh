@@ -13,7 +13,7 @@ const session = {
 
 test("client detail bridge permits exact scoped contracts and rejects widened variants", async () => {
   const { adapter } = harness(async () => new Response("{}", { status: 200 }));
-  for (const [method, path] of [
+  for (const [method, path, body] of [
     [
       "GET",
       "/api/admin/clients/account-console/scope-evaluation?scopes=openid+profile&subject=user",
@@ -62,6 +62,167 @@ test("client detail bridge permits exact scoped contracts and rejects widened va
     }),
     /not allowed/,
   );
+});
+
+test("authentication flow bridge allows the Web flow contracts and rejects widened routes", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  for (const [method, path] of [
+    ["GET", "/api/admin/authentication/flows?page=0&size=20&sort=name,asc"],
+    ["GET", "/api/admin/authentication/flows/12"],
+    ["POST", "/api/admin/authentication/flows"],
+    ["PUT", "/api/admin/authentication/flows/12"],
+    ["DELETE", "/api/admin/authentication/flows/12"],
+    ["POST", "/api/admin/authentication/flows/12/sub-flows"],
+    ["POST", "/api/admin/authentication/flows/12/executions"],
+    ["PUT", "/api/admin/authentication/flows/12/executions/34"],
+    ["DELETE", "/api/admin/authentication/flows/12/executions/34"],
+    ["PUT", "/api/admin/authentication/flows/12/nodes/EXECUTION/34/position"],
+    ["PUT", "/api/admin/authentication/bindings/FIRST_BROKER_LOGIN"],
+    ["DELETE", "/api/admin/authentication/bindings/RESET_CREDENTIALS"],
+    ["GET", "/api/admin/authentication/flows?page=2&size=50&sort=name,desc"],
+  ])
+    try {
+      assert.equal(
+        (await adapter.request({ console: "admin", method, path, body: {} }))
+          .status,
+        200,
+        `${method} ${path}`,
+      );
+    } catch (error) {
+      error.message = `${method} ${path}: ${error.message}`;
+      throw error;
+    }
+  for (const [method, path] of [
+    ["POST", "/api/admin/authentication/flows/12"],
+    ["GET", "/api/admin/authentication/flows/12?extra=true"],
+    ["PUT", "/api/admin/authentication/flows/12/nodes/UNKNOWN/34/position"],
+    ["PUT", "/api/admin/authentication/bindings/UNKNOWN"],
+    ["DELETE", "/api/admin/authentication/flows/12/sub-flows"],
+    ["PUT", "/api/admin/authentication/flows"],
+    ["PATCH", "/api/admin/authentication/flows"],
+    ["GET", "/api/admin/authentication/flows?page=1000001"],
+    ["GET", "/api/admin/authentication/flows?page=-1"],
+    ["GET", "/api/admin/authentication/flows?size=0"],
+    ["GET", "/api/admin/authentication/flows?size=101"],
+    ["GET", "/api/admin/authentication/flows?sort=priority,asc"],
+    ["GET", "/api/admin/authentication/flows?extra=true"],
+    ["GET", "/api/admin/authentication/flows?page=0&page=1"],
+    ["GET", "/api/admin/authentication/flows/9007199254740992"],
+    [
+      "PUT",
+      "/api/admin/authentication/flows/12/executions/9007199254740992",
+    ],
+  ])
+    await assert.rejects(
+      adapter.request({ console: "admin", method, path, body: {} }),
+      /not allowed/,
+      `${method} ${path}`,
+    );
+});
+
+test("allows only bounded Admin user-profile setting routes", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  for (const [method, path] of [
+    ["GET", "/api/admin/settings/user-profile/7"],
+    ["PUT", "/api/admin/settings/user-profile/7"],
+    ["DELETE", "/api/admin/settings/user-profile/7"],
+    ["GET", "/api/admin/settings/user-profile/page"],
+    ["GET", "/api/admin/settings/user-profile/page?q=preferred&page=2&size=50&sort=name,desc"],
+    ["GET", "/api/admin/settings/user-profile/page?page=999999&size=100&sort=displayOrder,desc"],
+  ]) {
+    try {
+      assert.equal((await adapter.request({ console: "admin", method, path })).status, 200, `${method} ${path}`);
+    } catch (error) {
+      error.message = `${method} ${path}: ${error.message}`;
+      throw error;
+    }
+  }
+  for (const [method, path] of [
+    ["GET", "/api/admin/settings/user-profile/0"],
+    ["PATCH", "/api/admin/settings/user-profile/7"],
+    ["GET", "/api/admin/settings/user-profile/9007199254740992"],
+    ["GET", "/api/admin/settings/user-profile/page?page=-1"],
+    ["GET", "/api/admin/settings/user-profile/page?page=01"],
+    ["GET", "/api/admin/settings/user-profile/page?page=10000000"],
+    ["GET", "/api/admin/settings/user-profile/page?size=0"],
+    ["GET", "/api/admin/settings/user-profile/page?size=101"],
+    ["GET", "/api/admin/settings/user-profile/page?sort=id,asc"],
+    ["GET", "/api/admin/settings/user-profile/page?q=" + "a".repeat(201)],
+    ["GET", "/api/admin/settings/user-profile/page?unknown=true"],
+    ["GET", "/api/admin/settings/user-profile/page?page=0&page=1"],
+    ["GET", "//attacker.invalid/api/admin/settings/user-profile/page"],
+  ]) {
+    await assert.rejects(
+      adapter.request({ console: "admin", method, path }),
+      /not allowed/,
+      `${method} ${path}`,
+    );
+  }
+  const OriginalURL = globalThis.URL;
+  globalThis.URL = class extends OriginalURL {
+    constructor(input, base) {
+      if (String(input).includes("/api/admin/settings/user-profile/page"))
+        throw new TypeError("malformed page URL");
+      super(input, base);
+    }
+  };
+  try {
+    await assert.rejects(
+      adapter.request({ console: "admin", path: "/api/admin/settings/user-profile/page" }),
+      /not allowed/,
+    );
+  } finally {
+    globalThis.URL = OriginalURL;
+  }
+});
+
+test("allows the Settings screens to read and update only their existing API routes", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  for (const [method, path] of [
+    ["GET", "/api/admin/settings/registration-captcha"],
+    ["PUT", "/api/admin/settings/registration-captcha"],
+    ["GET", "/api/admin/settings/social-providers"],
+    ["PUT", "/api/admin/settings/social-providers"],
+    ["POST", "/api/admin/settings/email/test"],
+    ["GET", "/api/admin/events/config"],
+    ["PUT", "/api/admin/events/config"],
+    ["PUT", "/api/admin/settings/user-profile/order"],
+    ["POST", "/api/admin/settings/user-profile"],
+    ["GET", "/api/admin/settings/user-profile"],
+  ])
+    assert.equal((await adapter.request({ console: "admin", method, path, body: {} })).status, 200, `${method} ${path}`);
+  for (const [method, path] of [
+    ["POST", "/api/admin/settings/registration-captcha"],
+    ["DELETE", "/api/admin/settings/social-providers"],
+    ["GET", "/api/admin/settings/email/test"],
+    ["DELETE", "/api/admin/events/config"],
+    ["POST", "/api/admin/settings/user-profile/order"],
+    ["PUT", "/api/admin/settings/user-profile"],
+  ])
+    await assert.rejects(adapter.request({ console: "admin", method, path }), /not allowed/, `${method} ${path}`);
+});
+
+test("authentication flow bridge rejects malformed URL parsing", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  const NativeURL = globalThis.URL;
+  globalThis.URL = class extends NativeURL {
+    constructor(input, base) {
+      if (String(input).startsWith("/api/admin/authentication/flows?"))
+        throw new TypeError("malformed URL");
+      super(input, base);
+    }
+  };
+  try {
+    await assert.rejects(
+      adapter.request({
+        console: "admin",
+        path: "/api/admin/authentication/flows?page=0",
+      }),
+      /not allowed/,
+    );
+  } finally {
+    globalThis.URL = NativeURL;
+  }
 });
 
 test("group bridge accepts detail, settings, permissions, roles and bounded members only", async () => {
@@ -122,6 +283,139 @@ test("group bridge accepts detail, settings, permissions, roles and bounded memb
     );
   await assert.rejects(
     adapter.request({ console: "account", path: "/api/admin/groups/7" }),
+    /not allowed/,
+  );
+});
+
+test("organization bridge permits bounded collection reads and only exact organization mutations", async () => {
+  const { adapter } = harness(async () => new Response("{}", { status: 200 }));
+  for (const [method, path, body] of [
+    ["GET", "/api/admin/organizations?q=acme&page=0&size=20&sort=name,asc"],
+    ["GET", "/api/admin/organizations?page=2&size=100&sort=name,desc"],
+    ["GET", "/api/admin/organizations/7"],
+    [
+      "GET",
+      "/api/admin/organizations/7/members?page=0&size=20&sort=user.username,asc",
+    ],
+    ["GET", "/api/admin/organizations/7/domains"],
+    [
+      "GET",
+      "/api/admin/organizations/7/invitations?page=0&size=20&sort=createdAt,desc",
+    ],
+    ["GET", "/api/admin/organizations/7/groups?page=0&size=20&sort=name,asc"],
+    ["GET", "/api/admin/organizations/7/claims"],
+    ["GET", "/api/admin/organizations/7/identity-providers"],
+    ["POST", "/api/admin/organizations"],
+    [
+      "POST",
+      "/api/admin/organizations/7/members",
+      { userId: 3, role: "MEMBER" },
+    ],
+    ["POST", "/api/admin/organizations/7/domains", { domain: "example.com" }],
+    [
+      "POST",
+      "/api/admin/organizations/7/invitations",
+      { email: "user@example.com", role: "MEMBER" },
+    ],
+    ["POST", "/api/admin/organizations/7/groups", { name: "Operators" }],
+    [
+      "POST",
+      "/api/admin/organizations/7/claims",
+      { claimName: "department", claimValue: "ops", addToAccessToken: true },
+    ],
+    [
+      "POST",
+      "/api/admin/organizations/7/identity-providers",
+      { providerAlias: "google" },
+    ],
+    ["POST", "/api/admin/organizations/7/domains/5/verify", {}],
+    ["DELETE", "/api/admin/organizations/7/members/3"],
+  ])
+    assert.equal(
+      (
+        await adapter.request({
+          console: "admin",
+          method,
+          path,
+          ...(body ? { body } : {}),
+        })
+      ).status,
+      200,
+      path,
+    );
+  for (const [method, path, body] of [
+    ["GET", "/api/admin/organizations/0"],
+    ["GET", "/api/admin/organizations/07"],
+    ["GET", "/api/admin/organizations/9007199254740992"],
+    ["GET", "/api/admin/organizations/7?extra=1"],
+    ["GET", "/api/admin/organizations/7/nested"],
+    ["GET", "/api/admin/organizations/7/groups?sort=id,asc"],
+    ["GET", "/api/admin/organizations/7/domains?size=20"],
+    ["GET", "/api/admin/organizations/7/claims?extra=1"],
+    ["GET", "/api/admin/organizations/7/members?page=01"],
+    ["GET", "/api/admin/organizations/9007199254740992/members?page=0"],
+    [
+      "POST",
+      "/api/admin/organizations/7/members",
+      { userId: "3", role: "MEMBER" },
+    ],
+    [
+      "POST",
+      "/api/admin/organizations/7/members",
+      { userId: 3, role: "ROLE_ADMIN" },
+    ],
+    [
+      "POST",
+      "/api/admin/organizations/7/claims",
+      { claimName: "role", claimValue: "admin", addToAccessToken: false },
+    ],
+    [
+      "POST",
+      "/api/admin/organizations/7/identity-providers",
+      { providerAlias: "google", enabled: true },
+    ],
+    ["POST", "/api/admin/organizations/7/domains/5/verify", { force: true }],
+    ["POST", "/api/admin/organizations/7/groups/2"],
+    ["DELETE", "/api/admin/organizations/7/domains/2"],
+    ["GET", "/api/admin/organizations/7#fragment"],
+    ["PUT", "/api/admin/organizations/7"],
+    ["DELETE", "/api/admin/organizations/7"],
+    ["GET", "/api/admin/organizations?size=101"],
+    ["GET", "/api/admin/organizations?page=-1"],
+    ["GET", "/api/admin/organizations?sort=alias,asc"],
+    ["GET", "/api/admin/organizations?q=a&q=b"],
+    ["GET", "/api/admin/organizations#fragment"],
+    ["POST", "/api/admin/organizations?extra=1"],
+    ["PUT", "/api/admin/organizations"],
+    ["DELETE", "/api/admin/organizations/7"],
+  ])
+    await assert.rejects(
+      adapter.request({
+        console: "admin",
+        method,
+        path,
+        ...(body ? { body } : {}),
+      }),
+      /not allowed|Invalid organization mutation request|Invalid organization domain verification request/,
+      path,
+    );
+  await assert.rejects(
+    adapter.request({
+      console: "account",
+      path: "/api/admin/organizations?page=0&size=10&sort=name,asc",
+    }),
+    /not allowed/,
+  );
+  let coercions = 0;
+  const malformedPath = {
+    startsWith: () => true,
+    [Symbol.toPrimitive]() {
+      coercions += 1;
+      throw new Error(`invalid path value ${coercions}`);
+    },
+  };
+  await assert.rejects(
+    adapter.request({ console: "admin", path: malformedPath }),
     /not allowed/,
   );
 });
@@ -1435,6 +1729,13 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     path: "/api/admin/settings/login",
   });
   assert.equal(loginSettings.status, 200);
+  const updatedLoginSettings = await adapter.request({
+    console: "admin",
+    path: "/api/admin/settings/login",
+    method: "PUT",
+    body: { passwordMinimumLength: 14, otpEnabled: true },
+  });
+  assert.equal(updatedLoginSettings.status, 200);
   const emailSettings = await adapter.request({
     console: "admin",
     path: "/api/admin/settings/email",
@@ -1530,7 +1831,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
     adapter.request({
       console: "admin",
       path: "/api/admin/settings/login",
-      method: "PUT",
+      method: "POST",
     }),
     /not allowed/,
   );
@@ -1808,7 +2109,7 @@ test("limits the Admin namespace to approved settings writes and bounded read co
   await assert.rejects(
     adapter.request({
       console: "admin",
-      path: "/api/admin/authentication/flows/1",
+      path: "/api/admin/authentication/flows/1/sub-flows",
       method: "DELETE",
     }),
     /not allowed/,

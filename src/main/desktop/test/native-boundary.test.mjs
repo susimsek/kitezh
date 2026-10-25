@@ -183,6 +183,66 @@ test("native desktop renderer does not depend on the Web component tree", async 
   assert.match(source, /onCallback/);
 });
 
+test("native build bundles the organizations screen into its single renderer module", async () => {
+  const source = await readFile(
+    path.join(desktopDirectory, "scripts", "build-native-renderer.mjs"),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /import \{ createOrganizationScreens \} from "\.\/organizations\.mjs"/,
+  );
+  assert.match(source, /path\.join\(sourceDirectory, "organizations\.mjs"\)/);
+});
+
+test("native organization create form matches Web control layout", async () => {
+  const source = await readFile(
+    path.join(desktopDirectory, "src", "native", "native.html"),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /\.organization-create-card \.actions\s*\{\s*justify-content:\s*flex-end/s,
+  );
+  assert.match(
+    source,
+    /\.organization-create-card textarea\s*\{\s*min-height:\s*104px/s,
+  );
+  assert.match(
+    source,
+    /\.organization-create-card \.organization-cancel-button\s*\{[^}]*border-color:\s*#6c757d/s,
+  );
+  assert.match(
+    source,
+    /\.organization-create-card \.organization-cancel-button\s*\{[^}]*display:\s*inline-flex;[^}]*align-items:\s*center;[^}]*justify-content:\s*center;[^}]*text-align:\s*center;/s,
+  );
+});
+
+test("native organization list styles match Web table columns and row actions", async () => {
+  const source = await readFile(
+    path.join(desktopDirectory, "src", "native", "native.html"),
+    "utf8",
+  );
+  for (const width of ["15%", "12%", "16%", "14%", "56px"]) {
+    assert.match(
+      source,
+      new RegExp(
+        `\\.organization-table th[^}]*width:\\s*${width.replace("%", "\\%")}`,
+        "s",
+      ),
+    );
+  }
+  assert.match(
+    source,
+    /\.organization-enabled-cell\s*\{[^}]*text-align:\s*center/s,
+  );
+  assert.match(
+    source,
+    /\.organization-row-actions\s*\{[^}]*text-align:\s*center/s,
+  );
+  assert.match(source, /\.organization-row-menu\s*\{[^}]*text-align:\s*left/s);
+});
+
 test("desktop runtime sources do not write directly to console logs", async () => {
   const sourcePaths = [
     path.join(desktopDirectory, "src", "main.ts"),

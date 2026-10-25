@@ -51,6 +51,24 @@ Same-window 1280 × 900 before/after screenshots and 200% zoom review captures a
 `src/main/desktop/e2e/artifacts/client-scopes/`. Windows native acceptance is complete for this
 change; macOS and Linux menu and high-contrast validation still depends on those target platforms.
 
+## Organizations list and create acceptance (2026-10-19)
+
+Native Admin navigation shows Organizations only when `/api/admin/whoami` grants
+`queryOrganizations` or `viewOrganizations`. The native list uses the bounded existing
+`GET /api/admin/organizations` contract, supports search, name sorting and paging, and shows
+the counts and enabled state returned by the backend. Create is visible only to
+`manageOrganizations` or an administrator and uses the existing validated
+`POST /api/admin/organizations` DTO. The Desktop adapter allows that exact POST and the bounded
+list query; it rejects detail, update, delete, duplicate query parameters, unsupported sort and
+out-of-range page sizes.
+
+English/Turkish labels, field validation, inline create progress, duplicate submission blocking,
+offline disabling, and the shared native 401/403/timeout handling are covered by
+`test/native-organizations-parity.test.mjs` and `test/api-adapter.test.mjs`. The native renderer
+does not import Web components. Organization detail and member/domain/invitation/group/provider/
+claim management remain outside this list/create slice; macOS/Linux packaged evidence remains
+open.
+
 ## Desktop P0 and P1
 
 | Scope                                                              | Status                                                              | Native implementation and evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Remaining work                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -216,3 +234,64 @@ The Native Admin surface is intentionally not marked fully complete while manage
 parity and packaged cross-platform smoke evidence remain open. Missing backend or
 registered-client capabilities must be reported as `Blocked`; permissions must not
 be broadened to work around them.
+
+## Authentication policies parity slice (2026-10-21)
+
+Reference route: `/admin/authentication`; source review: `AdminAuthentication.tsx`,
+`LoginSettings.tsx`, and `AuthenticationFlows.tsx`. The reference has the top tabs
+**Policies / Flows**. Policies has **Password policy / OTP policy / WebAuthn** in that
+order. Native now has the same tab order and the complete policy field groups from the
+Web policy screens, including nested registration and passwordless WebAuthn settings.
+Save and Cancel stay in the active section; save uses the existing authenticated
+`GET/PUT /api/admin/settings/login` contract through the scoped Desktop adapter. The
+renderer keeps password policy values as ordinary form data; it does not receive OAuth
+tokens, client secrets, or Web session records. Save retains its label, shows the shared
+check/progress icon, disables repeat submission, and maps API validation under its field.
+Both local languages have corresponding native catalog keys. Web policy tabs have no
+standalone icons; the save action uses the existing shared `check` icon metadata, so no
+new icon glyph was needed.
+Boolean fields in the Password policy, OTP policy, and both WebAuthn policy groups use
+accessible native toggle switches, matching Web's `Form.Check type="switch"` controls.
+Their 32×18 px track and 14 px thumb match the rendered Web switch proportions instead
+of reusing the larger 40×24 px switch used on other native screens.
+
+Focused evidence: `native-admin-renderer.test.mjs` verifies all three policy tabs, both
+WebAuthn sub-policies, OTP settings submission, the five Flows detail tabs in Web order,
+flow selection, and the Settings, Graph, Executions, and Bindings panels. The API adapter
+test verifies the existing login-settings and authentication-flow/binding endpoints and
+rejects malformed or widened routes. Flow CRUD, sub-flow creation, execution CRUD,
+reordering, paging, and binding updates use the existing Web backend contracts. All flow
+controls stay behind the native Admin authorization state, disable while offline, keep
+their labels while showing inline progress, and preserve localized field feedback.
+Shared native CSS now gives this screen the same heading hierarchy, underlined selected
+tabs, bordered cards, two-column form layout, control sizing, badges, and responsive
+wrapping used by the desktop Admin design system. No policy/flow icon has an independent
+text meaning; node reorder uses existing shared previous/next icon metadata and accessible
+labels remain on the buttons.
+
+Computer Use inspection of the running Web reference confirmed the title/description,
+top-right create action, Policies / Flows parent tabs, single-issuer note, and the ordered
+Flows tabs **Top-level flows / Flow settings / Flow graph / Executions / Bindings**. The
+top-level list contains Browser, Direct grant, First broker login, Post broker login,
+Registration, and Reset credentials, with Browser selected by default. The detail views
+use the Web heading/card hierarchy; Settings keeps built-in fields disabled while its
+Save action remains available; Graph and Executions show the flow-node rows; Bindings is
+a nested table with per-binding flow selection and save/remove action. Native now keeps
+all five detail tabs visible even before a flow is selected and renders these sections in
+that same order. Its list card includes the Web count, row selection/built-in badge, and
+page-size/range controls. Create, sub-flow, execution, binding, validation, offline,
+authorization, and save/cancel behaviors use the same existing Desktop API adapter paths
+and Web request fields; no parallel API or remote Web embedding was added.
+
+Focused `native-admin-renderer.test.mjs` assertions cover all five tabs, header action
+placement, built-in Save behavior and payload, inline validation, execution defaults,
+binding options and DELETE contract. The complete desktop unit suite passes 217/217.
+The shared native styles now provide the Web-aligned heading hierarchy, selected-tab
+underlines, bordered cards, form/control sizing, flow rows, badges, and pagination.
+The running Web screen was inspected through Computer Use, but this session exposes no
+native Electron window to Computer Use, so a native screenshot comparison remains open;
+DOM interaction tests and source/style inspection are the available native presentation
+evidence. Cross-platform packaged rendering evidence also remains open.
+
+Status: **In progress** pending visual screenshot review and packaged cross-platform
+rendering evidence.

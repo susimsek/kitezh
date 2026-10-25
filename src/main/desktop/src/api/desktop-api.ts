@@ -93,6 +93,116 @@ function isAllowedApiPath(
     }
   }
   if (namespace === "admin") {
+    if (path.startsWith("/api/admin/organizations")) {
+      try {
+        const url = new URL(path, "https://desktop.invalid");
+        if (url.origin !== "https://desktop.invalid" || url.hash) return false;
+        const detailMatch = /^\/api\/admin\/organizations\/([1-9]\d*)$/.exec(
+          url.pathname,
+        );
+        if (detailMatch)
+          return (
+            method === "GET" &&
+            Number.isSafeInteger(Number(detailMatch[1])) &&
+            url.search === ""
+          );
+        const collectionMatch =
+          /^\/api\/admin\/organizations\/([1-9]\d*)\/(members|domains|invitations|groups|claims|identity-providers)$/.exec(
+            url.pathname,
+          );
+        if (collectionMatch && method === "GET") {
+          if (!Number.isSafeInteger(Number(collectionMatch[1]))) return false;
+          const collection = collectionMatch[2];
+          const keys = [...url.searchParams.keys()];
+          if (
+            keys.some((key) => url.searchParams.getAll(key).length !== 1) ||
+            keys.some(
+              (key) =>
+                ![
+                  "page",
+                  "size",
+                  "sort",
+                  ...(collection === "members" || collection === "groups"
+                    ? ["q"]
+                    : []),
+                ].includes(key),
+            )
+          )
+            return false;
+          const page = url.searchParams.get("page");
+          const size = url.searchParams.get("size");
+          const sort = url.searchParams.get("sort");
+          const expectedSort: Record<string, string> = {
+            members: "user.username,asc",
+            invitations: "createdAt,desc",
+            groups: "name,asc",
+          };
+          const paged = Object.hasOwn(expectedSort, collection);
+          return (
+            (paged || keys.length === 0) &&
+            (page === null || /^(0|[1-9]\d{0,6})$/.test(page)) &&
+            Number(page ?? 0) <= 1_000_000 &&
+            (size === null ||
+              (/^[1-9]\d{0,2}$/.test(size) && Number(size) <= 100)) &&
+            (sort === null || sort === expectedSort[collection]) &&
+            (url.searchParams.get("q")?.length ?? 0) <= 200
+          );
+        }
+        const memberRemovalMatch =
+          /^\/api\/admin\/organizations\/([1-9]\d*)\/members\/([1-9]\d*)$/.exec(
+            url.pathname,
+          );
+        if (memberRemovalMatch)
+          return (
+            method === "DELETE" &&
+            Number.isSafeInteger(Number(memberRemovalMatch[1])) &&
+            Number.isSafeInteger(Number(memberRemovalMatch[2])) &&
+            url.search === ""
+          );
+        const domainVerifyMatch =
+          /^\/api\/admin\/organizations\/([1-9]\d*)\/domains\/([1-9]\d*)\/verify$/.exec(
+            url.pathname,
+          );
+        if (domainVerifyMatch)
+          return (
+            method === "POST" &&
+            Number.isSafeInteger(Number(domainVerifyMatch[1])) &&
+            Number.isSafeInteger(Number(domainVerifyMatch[2])) &&
+            url.search === ""
+          );
+        const addMatch =
+          /^\/api\/admin\/organizations\/([1-9]\d*)\/(members|domains|invitations|groups|claims|identity-providers)$/.exec(
+            url.pathname,
+          );
+        if (addMatch)
+          return (
+            method === "POST" &&
+            Number.isSafeInteger(Number(addMatch[1])) &&
+            url.search === ""
+          );
+        if (url.pathname !== "/api/admin/organizations") return false;
+        if (method === "POST") return !url.search;
+        if (method !== "GET") return false;
+        const keys = [...url.searchParams.keys()];
+        const page = url.searchParams.get("page");
+        const size = url.searchParams.get("size");
+        const sort = url.searchParams.get("sort");
+        return (
+          keys.every((key) => ["q", "page", "size", "sort"].includes(key)) &&
+          [...new Set(keys)].every(
+            (key) => url.searchParams.getAll(key).length === 1,
+          ) &&
+          (page === null || /^(0|[1-9]\d{0,6})$/.test(page)) &&
+          Number(page ?? 0) <= 1_000_000 &&
+          (size === null ||
+            (/^[1-9]\d{0,2}$/.test(size) && Number(size) <= 100)) &&
+          (sort === null || ["name,asc", "name,desc"].includes(sort)) &&
+          (url.searchParams.get("q")?.length ?? 0) <= 200
+        );
+      } catch {
+        return false;
+      }
+    }
     // Client detail contracts are exact and bounded independently of global resources.
     const clientDetailRoute =
       /^\/api\/admin\/clients\/[A-Za-z0-9_-]{1,100}\/(scope-evaluation|secret|sessions(?:\/[A-Za-z0-9_-]{1,100})?|consents|events)(?:\?|#|$)/.exec(
@@ -700,7 +810,33 @@ function isAllowedApiPath(
         path === "/api/admin/settings/branding" ||
         path === "/api/admin/settings/localization" ||
         path === "/api/admin/settings/email" ||
+        path === "/api/admin/settings/login" ||
         path === "/api/admin/settings/login/native")
+    )
+      return true;
+    if (
+      (method === "GET" || method === "PUT") &&
+      (path === "/api/admin/settings/registration-captcha" ||
+        path === "/api/admin/settings/social-providers")
+    )
+      return true;
+    if (method === "POST" && path === "/api/admin/settings/email/test")
+      return true;
+    if (method === "PUT" && path === "/api/admin/events/config") return true;
+    if (method === "GET" && path === "/api/admin/events/config") return true;
+    if (
+      method === "PUT" &&
+      path === "/api/admin/settings/user-profile/order"
+    )
+      return true;
+    if (method === "POST" && path === "/api/admin/settings/user-profile")
+      return true;
+    const userProfileDefinitionMatch =
+      /^\/api\/admin\/settings\/user-profile\/([1-9]\d*)$/.exec(path);
+    if (
+      userProfileDefinitionMatch &&
+      Number.isSafeInteger(Number(userProfileDefinitionMatch[1])) &&
+      ["GET", "PUT", "DELETE"].includes(method)
     )
       return true;
     if (
@@ -733,6 +869,63 @@ function isAllowedApiPath(
       /^\/api\/admin\/sessions\/[A-Za-z0-9_-]{1,100}$/.test(path)
     )
       return true;
+    const authenticationFlowPath = path.split("?")[0];
+    const authenticationFlowMatch =
+      /^\/api\/admin\/authentication\/flows(?:\/([1-9]\d*)(?:\/(sub-flows|executions(?:\/[1-9]\d*)?|nodes\/(?:EXECUTION|SUB_FLOW)\/[1-9]\d*\/position))?)?$/.exec(
+        authenticationFlowPath,
+      );
+    const authenticationBindingMatch =
+      /^\/api\/admin\/authentication\/bindings\/(BROWSER|DIRECT_GRANT|REGISTRATION|RESET_CREDENTIALS|FIRST_BROKER_LOGIN|POST_BROKER_LOGIN)$/.exec(
+        path,
+      );
+    const authenticationFlowDetailMatch =
+      /^\/api\/admin\/authentication\/flows\/([1-9]\d*)$/.exec(path);
+    if (
+      method === "GET" &&
+      authenticationFlowDetailMatch &&
+      Number.isSafeInteger(Number(authenticationFlowDetailMatch[1]))
+    )
+      return true;
+    if (authenticationFlowMatch) {
+      const id = authenticationFlowMatch[1];
+      const action = authenticationFlowMatch[2];
+      if (!id) {
+        if (method === "POST")
+          return path === "/api/admin/authentication/flows";
+        if (method !== "GET") return false;
+        try {
+          const url = new URL(path, "https://desktop.invalid");
+          return (
+            [...url.searchParams.keys()].every((key) =>
+              ["page", "size", "sort"].includes(key),
+            ) &&
+            [...new Set(url.searchParams.keys())].every(
+              (key) => url.searchParams.getAll(key).length === 1,
+            ) &&
+            /^(0|[1-9]\d{0,6})$/.test(url.searchParams.get("page") ?? "0") &&
+            Number(url.searchParams.get("page") ?? 0) <= 1_000_000 &&
+            /^(?:[1-9]\d?|100)$/.test(url.searchParams.get("size") ?? "20") &&
+            ["name,asc", "name,desc"].includes(
+              url.searchParams.get("sort") ?? "name,asc",
+            )
+          );
+        } catch {
+          return false;
+        }
+      }
+      if (path !== authenticationFlowPath) return false;
+      if (!Number.isSafeInteger(Number(id))) return false;
+      if (!action) return ["GET", "PUT", "DELETE"].includes(method);
+      if (action === "sub-flows") return method === "POST";
+      if (action === "executions") return method === "POST";
+      if (/^executions\/[1-9]\d*$/.test(action))
+        return (
+          Number.isSafeInteger(Number(action.split("/").at(-1))) &&
+          ["PUT", "DELETE"].includes(method)
+        );
+      if (/^nodes\//.test(action)) return method === "PUT";
+    }
+    if (authenticationBindingMatch) return ["PUT", "DELETE"].includes(method);
     if (method === "DELETE" && path === "/api/admin/events") return true;
     if (method !== "GET") return false;
     if (
@@ -754,6 +947,30 @@ function isAllowedApiPath(
     )
       return true;
     if (path === "/api/admin/settings/localization") return true;
+    if (path === "/api/admin/settings/user-profile") return true;
+    if (path.split("?")[0] === "/api/admin/settings/user-profile/page") {
+      try {
+        const url = new URL(path, "https://desktop.invalid");
+        return (
+          url.origin === "https://desktop.invalid" &&
+          !url.hash &&
+          [...new Set(url.searchParams.keys())].every(
+            (key) => url.searchParams.getAll(key).length === 1,
+          ) &&
+          [...url.searchParams.keys()].every((key) =>
+            ["q", "page", "size", "sort"].includes(key),
+          ) &&
+          /^(0|[1-9]\d{0,6})$/.test(url.searchParams.get("page") ?? "0") &&
+          /^(?:[1-9]\d?|100)$/.test(url.searchParams.get("size") ?? "10") &&
+          ["displayOrder,asc", "displayOrder,desc", "name,asc", "name,desc"].includes(
+            url.searchParams.get("sort") ?? "displayOrder,asc",
+          ) &&
+          (url.searchParams.get("q")?.length ?? 0) <= 200
+        );
+      } catch {
+        return false;
+      }
+    }
     if (
       path === "/api/admin/authentication/bindings" ||
       path === "/api/admin/authentication/execution-providers"
@@ -1006,9 +1223,16 @@ function isAllowedApiPath(
         (!isEvents ||
           ((url.searchParams.get("action")?.length ?? 0) <= 100 &&
             (url.searchParams.get("targetId")?.length ?? 0) <= 100 &&
-            ["", "client", "user", "session", "consent", "key", "role", "client-scope"].includes(
-              url.searchParams.get("targetType") ?? "",
-            ) &&
+            [
+              "",
+              "client",
+              "user",
+              "session",
+              "consent",
+              "key",
+              "role",
+              "client-scope",
+            ].includes(url.searchParams.get("targetType") ?? "") &&
             ["from", "to"].every((key) => {
               const value = url.searchParams.get(key);
               return (
@@ -1225,6 +1449,72 @@ export function createDesktopApiAdapter(options: AdapterOptions) {
 
   return {
     async request(request: NativeApiRequest): Promise<NativeApiResponse> {
+      if (
+        request.console === "admin" &&
+        request.method === "POST" &&
+        /^\/api\/admin\/organizations\/[1-9]\d*\/domains\/[1-9]\d*\/verify$/.test(
+          request.path,
+        ) &&
+        request.body !== undefined &&
+        (!request.body ||
+          typeof request.body !== "object" ||
+          Array.isArray(request.body) ||
+          Object.keys(request.body).length !== 0)
+      )
+        throw new Error("Invalid organization domain verification request");
+      if (
+        request.console === "admin" &&
+        request.method === "POST" &&
+        /^\/api\/admin\/organizations\/[1-9]\d*\/(members|domains|invitations|groups|claims|identity-providers)$/.test(
+          request.path,
+        )
+      ) {
+        const body = request.body as Record<string, unknown> | null;
+        const route = request.path.split("/").at(-1);
+        const keys =
+          body && typeof body === "object" && !Array.isArray(body)
+            ? Object.keys(body).sort().join(",")
+            : "";
+        const validRole =
+          body && ["OWNER", "ADMIN", "MEMBER"].includes(String(body.role));
+        const valid =
+          route === "members"
+            ? keys === "role,userId" &&
+              typeof body?.userId === "number" &&
+              Number.isSafeInteger(body.userId) &&
+              body.userId > 0 &&
+              validRole
+            : route === "domains"
+              ? keys === "domain" &&
+                typeof body?.domain === "string" &&
+                body.domain.trim().length > 0 &&
+                body.domain.length <= 255
+              : route === "invitations"
+                ? keys === "email,role" &&
+                  typeof body?.email === "string" &&
+                  body.email.length <= 254 &&
+                  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email) &&
+                  validRole
+                : route === "groups"
+                  ? keys === "name" &&
+                    typeof body?.name === "string" &&
+                    body.name.trim().length > 0 &&
+                    body.name.length <= 100
+                  : route === "claims"
+                    ? keys === "addToAccessToken,claimName,claimValue" &&
+                      body?.addToAccessToken === true &&
+                      typeof body.claimName === "string" &&
+                      body.claimName.trim().length > 0 &&
+                      body.claimName.length <= 200 &&
+                      typeof body.claimValue === "string" &&
+                      body.claimValue.trim().length > 0 &&
+                      body.claimValue.length <= 2000
+                    : keys === "providerAlias" &&
+                      typeof body?.providerAlias === "string" &&
+                      body.providerAlias.trim().length > 0 &&
+                      body.providerAlias.length <= 100;
+        if (!valid) throw new Error("Invalid organization mutation request");
+      }
       if (
         request.console === "admin" &&
         request.method === "POST" &&
